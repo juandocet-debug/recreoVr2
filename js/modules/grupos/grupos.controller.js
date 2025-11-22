@@ -5,12 +5,13 @@ import { TableManager } from '../../core/table-manager.js';
 console.log('🚀 Módulo Grupos cargado');
 
 let groupsTable;
+let studentsTable;
+let currentGroupId = null;
 
 export function loadGrupos() {
     const btn = document.getElementById('btnNew');
     const btnText = document.getElementById('btnNewText');
 
-    // Clear manual headers
     const thead = document.getElementById('tableHeader');
     const tbody = document.getElementById('tableBody');
     if (thead) thead.innerHTML = '';
@@ -47,8 +48,9 @@ export function loadGrupos() {
                     header: 'Gestión',
                     field: 'id',
                     render: (item) => `
+                        <button class="btn btn-sm btn-info" onclick="window.viewGroupStudents('${item.id}')" title="Ver Estudiantes" style="margin-right:5px;"><i class="fas fa-eye"></i></button>
                         <button class="btn btn-sm btn-warning" onclick="window.inviteStudents('${item.id}')" title="Invitar Estudiantes" style="margin-right:5px;"><i class="fas fa-envelope"></i></button>
-                        <button class="btn btn-sm btn-success" onclick="window.openStudentRegistration('${item.id}')" title="Registrar Estudiante"><i class="fas fa-user-plus"></i></button>
+                        <button class="btn btn-sm btn-success" onclick="window.openStudentForm('${item.id}')" title="Registrar Estudiante"><i class="fas fa-user-plus"></i></button>
                     `
                 }
             ],
@@ -62,7 +64,6 @@ export function loadGrupos() {
 function openGroupModal(groupId = null) {
     window.showForm(groupId ? 'Editar Grupo' : 'Nuevo Grupo');
 
-    // Remove existing custom form
     let groupForm = document.getElementById('groupForm');
     if (groupForm) groupForm.remove();
 
@@ -179,7 +180,6 @@ window.selectGroupProfessor = function (id) {
     const prof = store.professors.find(p => p.id == id);
     if (!prof) return;
 
-    // VALIDATION
     const validation = validateProfessor(id);
 
     document.getElementById('groupProfessorId').value = prof.id;
@@ -258,7 +258,327 @@ function deleteGroup(id) {
     }
 }
 
-// --- Invite & Register ---
+// ============ GESTIÓN DE ESTUDIANTES ============
+
+window.viewGroupStudents = function (groupId) {
+    currentGroupId = groupId;
+    const group = store.groups.find(g => g.id === groupId);
+
+    store.currentSection = 'admin-grupos';
+    document.getElementById('sectionTitle').textContent = `Estudiantes de ${group.name}`;
+    document.getElementById('headerTitle').textContent = `Estudiantes de ${group.name}`;
+
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('dataSection').style.display = 'block';
+    document.getElementById('formSection').style.display = 'none';
+
+    // BOTÓN VOLVER PERSONALIZADO
+    const backBtn = document.querySelector('.section-header button');
+    if (backBtn) {
+        backBtn.onclick = () => window.showDataSection('admin-grupos');
+    }
+
+    const btn = document.getElementById('btnNew');
+    const btnText = document.getElementById('btnNewText');
+    if (btnText) btnText.textContent = 'Agregar Estudiante';
+    if (btn) btn.onclick = () => window.openStudentForm(groupId);
+
+    const students = (store.students || []).filter(s => s.groupId === groupId);
+
+    if (studentsTable) {
+        studentsTable.updateData(students);
+    } else {
+        studentsTable = new TableManager({
+            containerId: 'dataSection',
+            data: students,
+            columns: [
+                {
+                    header: 'Foto',
+                    field: 'photo',
+                    render: (item) => {
+                        if (item.photo) {
+                            return `<img src="${item.photo}" alt="${item.name}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">`;
+                        }
+                        return `<div style="width:40px;height:40px;border-radius:50%;background:#ddd;display:flex;align-items:center;justify-content:center;font-weight:bold;">${item.name ? item.name[0] : '?'}</div>`;
+                    }
+                },
+                { header: 'Nombre', field: 'name' },
+                { header: 'Código', field: 'code' },
+                { header: 'Email', field: 'email' },
+                { header: 'Teléfono', field: 'phone' },
+                { header: 'Fecha Ingreso', field: 'joinedDate' }
+            ],
+            actions: { edit: true, delete: true },
+            onEdit: (id) => window.openStudentForm(groupId, id),
+            onDelete: (id) => deleteStudent(id)
+        });
+    }
+};
+
+window.openStudentForm = function (groupId, studentId = null) {
+    const group = store.groups.find(g => g.id === groupId);
+    window.showForm(studentId ? 'Editar Estudiante' : `Registrar Estudiante en ${group.name}`);
+
+    let studentForm = document.getElementById('studentForm');
+    if (studentForm) studentForm.remove();
+
+    createStudentForm(groupId, studentId);
+};
+
+function createStudentForm(groupId, studentId = null) {
+    const formSection = document.getElementById('formSection');
+    const form = document.createElement('form');
+    form.id = 'studentForm';
+
+    form.innerHTML = `
+        <style>
+            .student-form-layout {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                gap: 2rem;
+                margin-bottom: 1.5rem;
+            }
+            .photo-section {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+            }
+            .photo-upload-area {
+                width: 200px;
+                height: 240px;
+                border: 2px dashed #cbd5e0;
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #f7fafc;
+                cursor: pointer;
+                transition: all 0.3s;
+                position: relative;
+                overflow: hidden;
+            }
+            .photo-upload-area:hover {
+                border-color: #4299e1;
+                background: #ebf8ff;
+            }
+            .photo-preview {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: none;
+            }
+            .photo-placeholder {
+                text-align: center;
+                color: #a0aec0;
+            }
+            .photo-placeholder i {
+                font-size: 3rem;
+                margin-bottom: 0.5rem;
+            }
+        </style>
+        
+        <div class="student-form-layout">
+            <div class="photo-section">
+                <h4 style="margin:0;font-size:1rem;color:#2d3748;">Fotografía</h4>
+                <label for="studentPhoto" class="photo-upload-area">
+                    <img id="studentPhotoPreview" class="photo-preview">
+                    <div class="photo-placeholder" id="photoPlaceholder">
+                        <i class="fas fa-camera"></i>
+                        <div style="font-size:0.875rem;">Click para subir foto</div>
+                    </div>
+                </label>
+                <input type="file" id="studentPhoto" style="display:none;" accept="image/*" onchange="window.handleStudentPhoto(event)">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('studentPhoto').click()">
+                    <i class="fas fa-upload"></i> Cambiar Foto
+                </button>
+            </div>
+            
+            <div class="fields-section">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre Completo *</label>
+                        <input id="studentName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Código Estudiantil *</label>
+                        <input id="studentCode" class="form-control" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="studentEmail" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input id="studentPhone" class="form-control" placeholder="Ej: +57 300 123 4567">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Género *</label>
+                        <select id="studentGender" class="form-control" required>
+                            <option value="">-- Seleccionar --</option>
+                            <option value="Masculino">Masculino</option>
+                            <option value="Femenino">Femenino</option>
+                            <option value="Otro">Otro</option>
+                            <option value="Prefiero no decir">Prefiero no decir</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Sexo Biológico *</label>
+                        <select id="studentSex" class="form-control" required>
+                            <option value="">-- Seleccionar --</option>
+                            <option value="Masculino">Masculino</option>
+                            <option value="Femenino">Femenino</option>
+                            <option value="Intersexual">Intersexual</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Programa Académico</label>
+                        <select id="studentProgram" class="form-control">
+                            <option value="">-- Seleccionar --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Semestre Actual</label>
+                        <input type="number" id="studentSemester" class="form-control" min="1" max="12" placeholder="1-12">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Dirección de Residencia</label>
+                    <input id="studentAddress" class="form-control" placeholder="Calle, número, barrio, ciudad">
+                </div>
+                
+                <div class="form-group">
+                    <label>Observaciones / Notas</label>
+                    <textarea id="studentNotes" class="form-control" rows="3" placeholder="Información adicional relevante..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions" style="margin-top:1.5rem;border-top:1px solid #eee;padding-top:1rem;">
+            <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar Estudiante</button>
+        </div>
+    `;
+
+    formSection.appendChild(form);
+
+    // Populate programs
+    const programSelect = document.getElementById('studentProgram');
+    store.programs.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        programSelect.appendChild(opt);
+    });
+
+    // Load data if editing
+    if (studentId) {
+        const student = store.students.find(s => s.id == studentId);
+        if (student) {
+            document.getElementById('studentName').value = student.name || '';
+            document.getElementById('studentCode').value = student.code || '';
+            document.getElementById('studentEmail').value = student.email || '';
+            document.getElementById('studentPhone').value = student.phone || '';
+            document.getElementById('studentGender').value = student.gender || '';
+            document.getElementById('studentSex').value = student.sex || '';
+            document.getElementById('studentProgram').value = student.programId || '';
+            document.getElementById('studentSemester').value = student.semester || '';
+            document.getElementById('studentAddress').value = student.address || '';
+            document.getElementById('studentNotes').value = student.notes || '';
+
+            if (student.photo) {
+                const preview = document.getElementById('studentPhotoPreview');
+                const placeholder = document.getElementById('photoPlaceholder');
+                preview.src = student.photo;
+                preview.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+            }
+        }
+    }
+
+    form.onsubmit = (e) => {
+        e.preventDefault();
+        saveStudent(groupId, studentId);
+    };
+
+    form.querySelector('.btn-cancel').onclick = () => {
+        form.remove();
+        window.viewGroupStudents(groupId);
+    };
+}
+
+window.handleStudentPhoto = function (event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const preview = document.getElementById('studentPhotoPreview');
+            const placeholder = document.getElementById('photoPlaceholder');
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+function saveStudent(groupId, studentId) {
+    const photoPreview = document.getElementById('studentPhotoPreview');
+    const photoData = photoPreview.style.display !== 'none' ? photoPreview.src : null;
+
+    const studentData = {
+        id: studentId || Date.now(),
+        groupId: groupId,
+        name: document.getElementById('studentName').value,
+        code: document.getElementById('studentCode').value,
+        email: document.getElementById('studentEmail').value,
+        phone: document.getElementById('studentPhone').value || '',
+        gender: document.getElementById('studentGender').value || '',
+        sex: document.getElementById('studentSex').value || '',
+        programId: document.getElementById('studentProgram').value || '',
+        semester: parseInt(document.getElementById('studentSemester').value) || 0,
+        address: document.getElementById('studentAddress').value || '',
+        notes: document.getElementById('studentNotes').value || '',
+        photo: photoData,
+        joinedDate: studentId ?
+            store.students.find(s => s.id == studentId)?.joinedDate :
+            new Date().toISOString().split('T')[0]
+    };
+
+    if (!store.students) store.students = [];
+
+    const idx = store.students.findIndex(s => s.id == studentId);
+    if (idx !== -1) {
+        store.students[idx] = studentData;
+        showNotification('Estudiante actualizado');
+    } else {
+        store.students.push(studentData);
+        showNotification('Estudiante registrado');
+    }
+
+    document.getElementById('studentForm').remove();
+    window.viewGroupStudents(groupId);
+}
+
+function deleteStudent(id) {
+    if (confirm('¿Eliminar estudiante?')) {
+        store.students = store.students.filter(s => s.id != id);
+        window.viewGroupStudents(currentGroupId);
+        showNotification('Estudiante eliminado');
+    }
+}
+
+// ============ INVITACIONES ============
 
 window.inviteStudents = function (groupId) {
     const group = store.groups.find(g => g.id === groupId);
@@ -296,58 +616,4 @@ Coordinación Académica
     `;
     document.body.appendChild(modal);
     modal.querySelector('.modal-close').onclick = () => modal.remove();
-};
-
-window.openStudentRegistration = function (groupId) {
-    const group = store.groups.find(g => g.id === groupId);
-
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:500px">
-            <div class="modal-header">
-                <h3>Registrar Estudiante en ${group.name}</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="studentRegForm">
-                    <div class="form-group">
-                        <label>Nombre Completo</label>
-                        <input id="stdName" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Código Estudiantil</label>
-                        <input id="stdCode" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="stdEmail" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-success" style="width:100%;margin-top:1rem;">Registrar</button>
-                </form>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    modal.querySelector('.modal-close').onclick = () => modal.remove();
-
-    modal.querySelector('form').onsubmit = (e) => {
-        e.preventDefault();
-        const student = {
-            id: Date.now(),
-            name: document.getElementById('stdName').value,
-            code: document.getElementById('stdCode').value,
-            email: document.getElementById('stdEmail').value,
-            groupId: groupId,
-            joinedDate: new Date().toISOString().split('T')[0]
-        };
-
-        if (!store.students) store.students = [];
-        store.students.push(student);
-
-        showNotification('Estudiante registrado exitosamente');
-        modal.remove();
-        loadGrupos(); // Refresh table count
-    };
 };
