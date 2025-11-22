@@ -1,9 +1,11 @@
 import { store } from '../../core/store.js';
 import { showNotification } from '../../core/utils.js';
+import { TableManager } from '../../core/table-manager.js';
 
 console.log('🚀 Módulo Usuarios cargado');
 
-// Define functions locally
+let usuariosTable;
+
 function openProfModal(mode, id = null) {
   console.log(`Abrir modal profesor: ${mode}, id=${id}`);
   window.showForm(mode === 'create' ? 'Nuevo Profesor' : 'Editar Profesor');
@@ -34,9 +36,6 @@ function openProfModal(mode, id = null) {
         // Legacy fallback: try to split name
         const parts = item.name.split(' ');
         if (parts.length > 2) {
-          // Assume "Name Name Last Last" -> First: "Name Name", Last1: "Last", Last2: "Last"
-          // Or "Name Last Last"
-          // Let's try a simple heuristic: Last 2 are surnames if > 2 parts
           document.getElementById('profFirstName').value = parts.slice(0, -2).join(' ');
           document.getElementById('profLastName1').value = parts[parts.length - 2];
           document.getElementById('profLastName2').value = parts[parts.length - 1];
@@ -80,54 +79,59 @@ export function loadUsuarios() {
   console.log('👥 loadUsuarios ejecutándose');
   const btn = document.getElementById('btnNew');
   const btnText = document.getElementById('btnNewText');
+
+  // Limpiar headers manuales si existen, TableManager se encarga
   const thead = document.getElementById('tableHeader');
   const tbody = document.getElementById('tableBody');
+  if (thead) thead.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
 
   if (btnText) btnText.textContent = 'Nuevo Profesor';
   if (btn) btn.onclick = () => window.openProfModal('create');
 
-  const headers = ['Foto', 'Apellidos y Nombres', 'Cédula', 'Perfil', 'Acciones'];
-
-  if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-  if (tbody) tbody.innerHTML = '';
-
   const data = store.professors;
   console.log(`Encontrados ${data.length} profesores`);
 
-  if (!data.length && tbody) {
-    tbody.innerHTML = `<tr><td colspan='${headers.length}' style='text-align:center;padding:1.5rem'>No hay registros.</td></tr>`;
-    return;
-  }
-
-  if (tbody) {
-    data.forEach(item => {
-      // Construct display name: Last1 Last2 Name
-      let displayName = item.name;
-      if (item.lastName1) {
-        displayName = `<strong>${item.lastName1} ${item.lastName2 || ''}</strong>, ${item.firstName}`;
-      }
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${item.photo ? `<img src='${item.photo}' style='width:40px;height:40px;border-radius:50%'>` : `<div class='user-avatar' style='width:40px;height:40px'>${item.name.charAt(0)}</div>`}</td>
-        <td>${displayName}</td>
-        <td>${item.identification || 'N/A'}</td>
-        <td>${item.profile || ''}</td>
-        <td>
-            <button class='btn btn-primary edit-btn' data-id="${item.id}"><i class='fas fa-edit'></i></button> 
-            <button class='btn btn-danger delete-btn' data-id="${item.id}"><i class='fas fa-trash'></i></button>
-        </td>
-        `;
-      tr.querySelector('.edit-btn').addEventListener('click', () => openProfModal('edit', item.id));
-      tr.querySelector('.delete-btn').addEventListener('click', () => deleteProf(item.id));
-      tbody.appendChild(tr);
+  if (usuariosTable) {
+    usuariosTable.updateData(data);
+  } else {
+    usuariosTable = new TableManager({
+      containerId: 'dataSection',
+      data: data,
+      columns: [
+        {
+          header: 'Foto',
+          field: 'photo',
+          render: (item) => item.photo ? `<img src='${item.photo}' style='width:40px;height:40px;border-radius:50%'>` : `<div class='user-avatar' style='width:40px;height:40px'>${item.name.charAt(0)}</div>`
+        },
+        {
+          header: 'Apellidos y Nombres',
+          field: 'name',
+          render: (item) => {
+            if (item.lastName1) {
+              return `<strong>${item.lastName1} ${item.lastName2 || ''}</strong>, ${item.firstName}`;
+            }
+            return item.name;
+          },
+          renderText: (item) => {
+            if (item.lastName1) {
+              return `${item.lastName1} ${item.lastName2 || ''}, ${item.firstName}`;
+            }
+            return item.name;
+          }
+        },
+        { header: 'Cédula', field: 'identification' },
+        { header: 'Perfil', field: 'profile' }
+      ],
+      actions: { edit: true, delete: true },
+      onEdit: (id) => window.openProfModal('edit', id),
+      onDelete: (id) => window.deleteProf(id)
     });
   }
 
   // Handle Form Submission
   const form = document.getElementById('profForm');
   if (form) {
-    // Remove previous listener to avoid duplicates if any
     const newForm = form.cloneNode(true);
     form.parentNode.replaceChild(newForm, form);
 
@@ -146,7 +150,7 @@ export function loadUsuarios() {
         firstName,
         lastName1,
         lastName2,
-        name: `${firstName} ${lastName1} ${lastName2}`.trim(), // Computed for compatibility
+        name: `${firstName} ${lastName1} ${lastName2}`.trim(),
         identification: document.getElementById('profIdNum').value,
         phone: document.getElementById('profPhone').value,
         email: document.getElementById('profEmail').value,
@@ -154,7 +158,7 @@ export function loadUsuarios() {
         cv: document.getElementById('profCv').value,
         profile: document.getElementById('profProfile').value,
         role: document.getElementById('profRole').value,
-        photo: '' // Handle photo if needed
+        photo: ''
       };
 
       if (mode === 'create') {
@@ -166,10 +170,10 @@ export function loadUsuarios() {
         showNotification('Profesor actualizado');
       }
 
+      if (usuariosTable) usuariosTable.updateData(store.professors);
       window.showDataSection('roles-permisos');
     };
 
-    // Re-attach cancel button listener because we cloned the form
     const cancelBtn = newForm.querySelector('.btn-cancel');
     if (cancelBtn) {
       cancelBtn.onclick = () => {

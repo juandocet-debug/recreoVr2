@@ -38,7 +38,6 @@ window.showDataSection = (sectionType) => {
 
     // Update Sidebar
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
-    // Find the link that calls this section - simple heuristic
     const activeLink = Array.from(document.querySelectorAll('.nav-item')).find(el => el.onclick && el.onclick.toString().includes(`'${sectionType}'`));
     if (activeLink) activeLink.classList.add('active');
 
@@ -65,11 +64,21 @@ window.showDataSection = (sectionType) => {
     const searchBox = document.getElementById('subjectSearchBox');
     if (searchBox) searchBox.remove();
 
-    // Clean up all custom forms to prevent duplication
-    const customForms = ['facultyForm', 'programForm', 'subjectForm', 'activityForm', 'planWorkForm', 'planEditorForm'];
-    customForms.forEach(formId => {
-        const form = document.getElementById(formId);
-        if (form) form.remove();
+    // Aggressive Form Cleanup
+    // Remove ANY form that is not one of the static ones
+    const staticForms = ['dataForm', 'profForm'];
+    const formSection = document.getElementById('formSection');
+    const forms = formSection.querySelectorAll('form');
+    forms.forEach(f => {
+        if (!staticForms.includes(f.id)) {
+            f.remove();
+        }
+    });
+
+    // Also ensure static forms are hidden/reset if needed
+    staticForms.forEach(id => {
+        const f = document.getElementById(id);
+        if (f) f.style.display = 'none';
     });
 
     // Router Logic
@@ -91,15 +100,26 @@ window.showForm = (title) => {
     formSection.style.display = 'block';
     document.getElementById('formTitle').textContent = title;
 
-    // SOLUCIÓN SIMPLE: Ocultar los formularios estáticos
-    const dataForm = document.getElementById('dataForm');
-    const profForm = document.getElementById('profForm');
-    if (dataForm) dataForm.style.display = 'none';
-    if (profForm) profForm.style.display = 'none';
+    // 1. Ocultar formularios estáticos conocidos
+    const staticForms = ['dataForm', 'profForm'];
+    staticForms.forEach(id => {
+        const f = document.getElementById(id);
+        if (f) f.style.display = 'none';
+    });
+
+    // 2. Eliminar formularios dinámicos inyectados previamente
+    // Eliminar cualquier form que no sea estático para evitar acumulaciones
+    const forms = formSection.querySelectorAll('form');
+    forms.forEach(f => {
+        if (!staticForms.includes(f.id)) {
+            f.remove();
+        }
+    });
 
     // Setup Cancel Button
     const cancelBtns = document.querySelectorAll('.btn-cancel');
     cancelBtns.forEach(btn => {
+        // Remove old listeners to be safe (cloning node is a trick, but simple reassignment works if we don't need multiple listeners)
         btn.onclick = () => {
             window.showDataSection(store.currentSection);
         };

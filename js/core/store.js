@@ -19,6 +19,7 @@ export const store = {
         { id: 'G-001', name: '2025-1', date: '2025-02-01', description: 'Cohorte 2025-1', features: 'Investigación aplicada', advisorId: 'P-001' },
         { id: 'G-002', name: '2025-2', date: '2025-08-01', description: 'Cohorte 2025-2', features: 'Plan piloto', advisorId: 'P-002' }
     ],
+    students: [],
     users: {
         admin: { password: 'admin123', role: 'administrador', name: 'Administrador' },
         coord: { password: 'coord123', role: 'coordinador', name: 'Coordinador' },
