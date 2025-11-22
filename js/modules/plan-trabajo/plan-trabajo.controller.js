@@ -86,9 +86,22 @@ function createPlanEditorForm() {
         <div class="form-section">
             <h3>Información General</h3>
             <div class="form-row">
-                <div class="form-group">
+                <div class="form-group" style="position:relative;">
                     <label>Profesor</label>
-                    <select id="planProfessor" class="form-control" required></select>
+                    <input type="text" id="planProfessorSearch" class="form-control" placeholder="Buscar por nombre o cédula..." autocomplete="off">
+                    <input type="hidden" id="planProfessorId">
+                    <div id="planProfessorResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
+                    
+                    <!-- Info Card -->
+                    <div id="selectedProfessorInfo" style="display:none;margin-top:0.5rem;padding:0.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;font-size:0.875rem;">
+                        <div style="font-weight:bold" id="infoName"></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.25rem;">
+                            <div>🆔 <span id="infoId"></span></div>
+                            <div>📧 <span id="infoEmail"></span></div>
+                            <div>📞 <span id="infoPhone"></span></div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link" style="color:#ef4444;padding:0;margin-top:0.25rem;" onclick="window.clearProfessorSelection()">Cambiar profesor</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Periodo</label>
@@ -201,7 +214,9 @@ function createPlanEditorForm() {
     });
 
     // Populate dropdowns
-    populateProfessorDropdown();
+    // Populate dropdowns
+    // populateProfessorDropdown(); // Replaced by search
+    setupProfessorSearch();
     populateFacultyDropdown();
 
     // Wire up faculty change to update program dropdown
@@ -270,7 +285,9 @@ window.updateDedicationHours = function () {
 };
 
 function resetPlanForm() {
-    document.getElementById('planProfessor').value = '';
+    document.getElementById('planProfessorSearch').value = '';
+    document.getElementById('planProfessorId').value = '';
+    document.getElementById('selectedProfessorInfo').style.display = 'none';
     document.getElementById('planPeriod').value = '';
     document.getElementById('planYear').value = new Date().getFullYear();
     // Clear all blocks
@@ -280,7 +297,14 @@ function loadPlanData(planId) {
     const plan = store.workPlans.find(p => p.id === planId);
     if (!plan) return;
 
-    document.getElementById('planProfessor').value = plan.professorId;
+    // Load professor info
+    const prof = store.professors.find(p => p.id == plan.professorId);
+    if (prof) {
+        selectProfessor(prof);
+    } else {
+        document.getElementById('planProfessorId').value = plan.professorId;
+        document.getElementById('planProfessorSearch').value = 'Profesor no encontrado';
+    }
     document.getElementById('planPeriod').value = plan.period;
     document.getElementById('planYear').value = plan.year;
     document.getElementById('planFaculty').value = plan.generalInfo.facultyId || '';
@@ -386,7 +410,7 @@ function savePlan() {
 
     const planData = {
         id: currentPlanId,
-        professorId: parseInt(document.getElementById('planProfessor').value),
+        professorId: parseInt(document.getElementById('planProfessorId').value),
         period: document.getElementById('planPeriod').value,
         year: parseInt(document.getElementById('planYear').value),
         status: 'draft',
@@ -815,3 +839,80 @@ function addActivityToPlan(activityId, activityType) {
 // Expose updateHoursSummary globally for onclick handlers
 window.updateHoursSummary = updateHoursSummary;
 window.closePlanEditor = closePlanEditor;
+
+// --- Search Logic ---
+
+function setupProfessorSearch() {
+    const input = document.getElementById('planProfessorSearch');
+    const results = document.getElementById('planProfessorResults');
+
+    if (!input || !results) return;
+
+    input.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        if (term.length < 2) {
+            results.style.display = 'none';
+            return;
+        }
+
+        const matches = store.professors.filter(p =>
+            (p.name && p.name.toLowerCase().includes(term)) ||
+            (p.identification && p.identification.includes(term)) ||
+            (p.firstName && p.firstName.toLowerCase().includes(term)) ||
+            (p.lastName1 && p.lastName1.toLowerCase().includes(term))
+        );
+
+        if (matches.length > 0) {
+            results.innerHTML = matches.map(p => `
+                <div class="search-item" style="padding:0.5rem;cursor:pointer;border-bottom:1px solid #eee;" 
+                     onmouseover="this.style.background='#f3f4f6'" 
+                     onmouseout="this.style.background='white'"
+                     onclick="window.selectProfessor(${p.id})">
+                    <div style="font-weight:bold">${p.name}</div>
+                    <div style="font-size:0.75rem;color:#666">CC: ${p.identification || 'N/A'} | ${p.email}</div>
+                </div>
+            `).join('');
+            results.style.display = 'block';
+        } else {
+            results.innerHTML = '<div style="padding:0.5rem;color:#666">No se encontraron resultados</div>';
+            results.style.display = 'block';
+        }
+    });
+
+    // Hide results when clicking outside
+    document.addEventListener('click', (e) => {
+        if (e.target !== input && e.target !== results) {
+            results.style.display = 'none';
+        }
+    });
+}
+
+window.selectProfessor = function (idOrObj) {
+    let prof = idOrObj;
+    if (typeof idOrObj !== 'object') {
+        prof = store.professors.find(p => p.id == idOrObj);
+    }
+
+    if (!prof) return;
+
+    document.getElementById('planProfessorId').value = prof.id;
+    document.getElementById('planProfessorSearch').value = prof.name;
+    document.getElementById('planProfessorResults').style.display = 'none';
+
+    // Show Info Card
+    document.getElementById('infoName').textContent = prof.name;
+    document.getElementById('infoId').textContent = prof.identification || 'N/A';
+    document.getElementById('infoEmail').textContent = prof.email || 'N/A';
+    document.getElementById('infoPhone').textContent = prof.phone || 'N/A';
+
+    document.getElementById('selectedProfessorInfo').style.display = 'block';
+    document.getElementById('planProfessorSearch').style.display = 'none'; // Hide search input
+};
+
+window.clearProfessorSelection = function () {
+    document.getElementById('planProfessorId').value = '';
+    document.getElementById('planProfessorSearch').value = '';
+    document.getElementById('planProfessorSearch').style.display = 'block';
+    document.getElementById('selectedProfessorInfo').style.display = 'none';
+    document.getElementById('planProfessorSearch').focus();
+};

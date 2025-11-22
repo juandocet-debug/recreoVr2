@@ -24,7 +24,35 @@ function openProfModal(mode, id = null) {
     if (item) {
       form.dataset.mode = 'edit';
       form.dataset.id = id;
-      document.getElementById('profName').value = item.name;
+
+      // Handle name fields (new vs legacy)
+      if (item.firstName) {
+        document.getElementById('profFirstName').value = item.firstName;
+        document.getElementById('profLastName1').value = item.lastName1;
+        document.getElementById('profLastName2').value = item.lastName2 || '';
+      } else {
+        // Legacy fallback: try to split name
+        const parts = item.name.split(' ');
+        if (parts.length > 2) {
+          // Assume "Name Name Last Last" -> First: "Name Name", Last1: "Last", Last2: "Last"
+          // Or "Name Last Last"
+          // Let's try a simple heuristic: Last 2 are surnames if > 2 parts
+          document.getElementById('profFirstName').value = parts.slice(0, -2).join(' ');
+          document.getElementById('profLastName1').value = parts[parts.length - 2];
+          document.getElementById('profLastName2').value = parts[parts.length - 1];
+        } else if (parts.length === 2) {
+          document.getElementById('profFirstName').value = parts[0];
+          document.getElementById('profLastName1').value = parts[1];
+          document.getElementById('profLastName2').value = '';
+        } else {
+          document.getElementById('profFirstName').value = item.name;
+          document.getElementById('profLastName1').value = '';
+          document.getElementById('profLastName2').value = '';
+        }
+      }
+
+      document.getElementById('profIdNum').value = item.identification || '';
+      document.getElementById('profPhone').value = item.phone || '';
       document.getElementById('profEmail').value = item.email;
       document.getElementById('profSpecialty').value = item.specialty || '';
       document.getElementById('profCv').value = item.cv || '';
@@ -58,7 +86,7 @@ export function loadUsuarios() {
   if (btnText) btnText.textContent = 'Nuevo Profesor';
   if (btn) btn.onclick = () => window.openProfModal('create');
 
-  const headers = ['Foto', 'Nombre', 'Perfil', 'Acciones'];
+  const headers = ['Foto', 'Apellidos y Nombres', 'Cédula', 'Perfil', 'Acciones'];
 
   if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
   if (tbody) tbody.innerHTML = '';
@@ -73,10 +101,17 @@ export function loadUsuarios() {
 
   if (tbody) {
     data.forEach(item => {
+      // Construct display name: Last1 Last2 Name
+      let displayName = item.name;
+      if (item.lastName1) {
+        displayName = `<strong>${item.lastName1} ${item.lastName2 || ''}</strong>, ${item.firstName}`;
+      }
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${item.photo ? `<img src='${item.photo}' style='width:40px;height:40px;border-radius:50%'>` : `<div class='user-avatar' style='width:40px;height:40px'>${item.name.charAt(0)}</div>`}</td>
-        <td>${item.name}</td>
+        <td>${displayName}</td>
+        <td>${item.identification || 'N/A'}</td>
         <td>${item.profile || ''}</td>
         <td>
             <button class='btn btn-primary edit-btn' data-id="${item.id}"><i class='fas fa-edit'></i></button> 
@@ -102,9 +137,18 @@ export function loadUsuarios() {
       const mode = newForm.dataset.mode;
       const id = newForm.dataset.id;
 
+      const firstName = document.getElementById('profFirstName').value;
+      const lastName1 = document.getElementById('profLastName1').value;
+      const lastName2 = document.getElementById('profLastName2').value;
+
       const newProf = {
         id: mode === 'create' ? Date.now() : parseInt(id),
-        name: document.getElementById('profName').value,
+        firstName,
+        lastName1,
+        lastName2,
+        name: `${firstName} ${lastName1} ${lastName2}`.trim(), // Computed for compatibility
+        identification: document.getElementById('profIdNum').value,
+        phone: document.getElementById('profPhone').value,
         email: document.getElementById('profEmail').value,
         specialty: document.getElementById('profSpecialty').value,
         cv: document.getElementById('profCv').value,
@@ -124,6 +168,15 @@ export function loadUsuarios() {
 
       window.showDataSection('roles-permisos');
     };
+
+    // Re-attach cancel button listener because we cloned the form
+    const cancelBtn = newForm.querySelector('.btn-cancel');
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        window.showDataSection('roles-permisos');
+      };
+    }
+
   } else {
     console.error('❌ No se encontró el formulario profForm');
   }
