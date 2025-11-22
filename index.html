@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recreo - Sistema de Gestión Académica</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+  <div id="loginScreen" class="login-container">
+    <div class="login-card">
+      <div class="login-logo"><i class="fas fa-graduation-cap"></i></div>
+      <h1 class="login-title">Recreo</h1>
+      <p class="login-subtitle">Sistema de Gestión Académica</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="userRole">Tipo de Usuario</label>
+          <select id="userRole" class="form-control" required>
+            <option value="">Seleccionar rol...</option>
+            <option value="estudiante">Estudiante</option>
+            <option value="profesor">Profesor</option>
+            <option value="coordinador">Coordinador</option>
+            <option value="administrador">Administrador</option>
+          </select>
+        </div>
+        <div class="form-group"><label for="username">Usuario</label><input id="username" class="form-control" required>
+        </div>
+        <div class="form-group"><label for="password">Contraseña</label><input type="password" id="password"
+            class="form-control" required></div>
+        <button class="btn-login" type="submit"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="appContainer" class="app-container">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo"><i class="fas fa-graduation-cap"></i></div>
+        <div class="sidebar-title">Recreo</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="showSection('dashboard')">
+          <i class="fas fa-home"></i><span class="nav-text">Inicio</span>
+        </a>
+
+        <!-- Gestión de la Docencia -->
+        <a href="#" class="nav-item">
+          <i class="fas fa-chalkboard-teacher"></i>
+          <span class="nav-text">Gestión de la Docencia</span>
+          <i class="fas fa-chevron-down nav-arrow"></i>
+        </a>
+        <div class="submenu">
+          <a href="#" class="nav-item" onclick="showDataSection('acta')">
+            <i class="fas fa-file-signature"></i><span class="nav-text">Registro de Actas</span>
+          </a>
+          <a href="#" class="nav-item" onclick="showDataSection('plan-trabajo')">
+            <i class="fas fa-clipboard-list"></i><span class="nav-text">Plan de Trabajo</span>
+          </a>
+        </div>
+
+        <!-- Prácticas -->
+        <a href="#" class="nav-item">
+          <i class="fas fa-briefcase"></i>
+          <span class="nav-text">Prácticas</span>
+          <i class="fas fa-chevron-down nav-arrow"></i>
+        </a>
+        <div class="submenu">
+          <a href="#" class="nav-item" onclick="showDataSection('sites')">
+            <i class="fas fa-building"></i><span class="nav-text">Administrar Sitio de Práctica</span>
+          </a>
+        </div>
+
+        <!-- Gestión de Usuarios -->
+        <a href="#" class="nav-item">
+          <i class="fas fa-user-cog"></i>
+          <span class="nav-text">Gestión de Usuarios</span>
+          <i class="fas fa-chevron-down nav-arrow"></i>
+        </a>
+        <div class="submenu">
+          <a href="#" class="nav-item" onclick="showDataSection('roles-permisos')">
+            <i class="fas fa-user-shield"></i><span class="nav-text">Profesores</span>
+          </a>
+        </div>
+
+        <!-- Accesos directos existentes -->
+        <a href="#" class="nav-item" onclick="showDataSection('documentos')">
+          <i class="fas fa-folder-plus"></i><span class="nav-text">Gestión de Documentos</span>
+        </a>
+        <a href="#" class="nav-item" onclick="showDataSection('admin-grupos')">
+          <i class="fas fa-users-cog"></i><span class="nav-text">Administración de Grupos</span>
+        </a>
+        <a href="#" class="nav-item" onclick="showDataSection('utilidades')">
+          <i class="fas fa-cog"></i><span class="nav-text">Configuración</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="main-content">
+      <div class="header">
+        <h1 class="header-title" id="headerTitle">Dashboard</h1>
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <span id="userDisplay">Usuario</span>
+          <button class="logout-btn" onclick="logout()" title="Cerrar Sesión">
+            <i class="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="content">
+        <div id="dashboard">
+          <div class="dashboard-grid">
+            <div class="dashboard-card">
+              <div class="card-header">
+                <div class="card-icon theme-docencia"><i class="fas fa-chalkboard-teacher"></i></div>
+                <div class="card-title">Gestión de Docencia</div>
+              </div>
+              <ul>
+                <li><a href="#" onclick="showDataSection('acta')">Registro de actas estudiantes</a></li>
+                <li><a href="#" onclick="showDataSection('plan-trabajo')">Plan de Trabajo Docente</a></li>
+              </ul>
+            </div>
+            <div class="dashboard-card">
+              <div class="card-header">
+                <div class="card-icon theme-practicas"><i class="fas fa-folder-plus"></i></div>
+                <div class="card-title">Documentos</div>
+              </div>
+              <ul>
+                <li><a href="#" onclick="showDataSection('documentos')">Gestión de Documentos</a></li>
+              </ul>
+            </div>
+            <div class="dashboard-card">
+              <div class="card-header">
+                <div class="card-icon theme-salidas"><i class="fas fa-users-cog"></i></div>
+                <div class="card-title">Grupos</div>
+              </div>
+              <ul>
+                <li><a href="#" onclick="showDataSection('admin-grupos')">Administración de Grupos</a></li>
+              </ul>
+            </div>
+            <div class="dashboard-card">
+              <div class="card-header">
+                <div class="card-icon theme-admin"><i class="fas fa-user-shield"></i></div>
+                <div class="card-title">Profesores</div>
+              </div>
+              <ul>
+                <li><a href="#" onclick="showDataSection('roles-permisos')">Gestión de Profesores</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="dataSection" class="data-section" style="display:none;">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title" id="sectionTitle">Gestión de Datos</h2>
+              <button class="btn btn-secondary" onclick="showSection('dashboard')"><i class="fas fa-arrow-left"></i>
+                Volver</button>
+            </div>
+            <div class="section-actions">
+              <button id="btnNew" class="btn btn-primary"><i class="fas fa-plus"></i> <span id="btnNewText">Nuevo
+                  Registro</span></button>
+            </div>
+          </div>
+          <table id="dataTable">
+            <thead id="tableHeader"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="formSection" class="data-section" style="display:none;">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title" id="formTitle">Nuevo Registro</h2>
+              <button class="btn btn-secondary btn-cancel" id="btnCancelForm"><i class="fas fa-times"></i>
+                Cancelar</button>
+            </div>
+          </div>
+
+          <!-- Formulario General (Actas, Documentos, Sitios, Grupos) -->
+          <form id="dataForm" style="display:none;">
+            <!-- Vincular documento base (para actas) -->
+            <div id="formRowDocLink" class="form-row" style="display:none">
+              <div class="form-group" style="grid-column:1/-1">
+                <label for="linkedDoc">Seleccionar Documento Base (autocompleta la fecha)</label>
+                <select id="linkedDoc" class="form-control"></select>
+              </div>
+            </div>
+
+            <!-- Campos generales -->
+            <div class="form-row">
+              <div id="formGroupTitle" class="form-group">
+                <label id="labelTitle" for="recordTitle">Título</label>
+                <input id="recordTitle" class="form-control">
+              </div>
+              <div id="formGroupType" class="form-group">
+                <label for="recordType">Tipo de Documento</label>
+                <select id="recordType" class="form-control">
+                  <option value="Acta Estudiantes">Acta Estudiantes</option>
+                  <option value="Informe">Informe</option>
+                  <option value="Memorando">Memorando</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div id="formGroupGroup" class="form-group">
+                <label for="recordGroup">Grupo (Cohorte)</label>
+                <select id="recordGroup" class="form-control"></select>
+              </div>
+              <div id="formGroupAdvisor" class="form-group">
+                <label for="recordAdvisor">Docente Asignado</label>
+                <select id="recordAdvisor" class="form-control"></select>
+              </div>
+              <div id="formGroupDate" class="form-group">
+                <label for="recordDate">Fecha</label>
+                <input type="date" id="recordDate" class="form-control">
+              </div>
+            </div>
+
+            <!-- Detalles de acta -->
+            <div id="formGroupActaDetails" style="display:none">
+              <div class="form-group"><label for="recordLogros">Logros</label><textarea id="recordLogros"
+                  class="form-control" rows="2"></textarea></div>
+              <div class="form-group"><label for="recordAcuerdos">Acuerdos</label><textarea id="recordAcuerdos"
+                  class="form-control" rows="2"></textarea></div>
+              <div class="form-group"><label for="recordSintesis">Compromisos / Síntesis</label><textarea
+                  id="recordSintesis" class="form-control" rows="2"></textarea></div>
+            </div>
+
+            <!-- Descripción genérica -->
+            <div id="formGroupDescription" class="form-group" style="display:none">
+              <label id="labelDescription" for="recordDescription">Descripción</label>
+              <textarea id="recordDescription" class="form-control" rows="3"></textarea>
+            </div>
+
+            <!-- Archivos -->
+            <div id="formRowFiles" class="form-row" style="display:none">
+              <div class="form-group">
+                <label>Acta (PDF)</label>
+                <label class="file-upload-box" for="actaPdf">
+                  <input type="file" id="actaPdf" accept="application/pdf"
+                    onchange="previewFileName(event,'pdfFileName')">
+                  <div class="upload-content"><i class="fas fa-file-pdf upload-icon"></i><span class="upload-text"
+                      id="pdfFileName">Seleccionar PDF</span></div>
+                </label>
+              </div>
+              <div class="form-group">
+                <label>Evidencia Fotográfica 1</label>
+                <label class="file-upload-box" for="photo1">
+                  <input type="file" id="photo1" accept="image/*" onchange="previewImage(event,'photoPreview1')">
+                  <img id="photoPreview1" class="upload-preview" style="display:none" alt="Vista previa 1">
+                  <div class="upload-content"><i class="fas fa-camera upload-icon"></i><span
+                      class="upload-text">Seleccionar foto</span></div>
+                </label>
+              </div>
+              <div class="form-group">
+                <label>Evidencia Fotográfica 2</label>
+                <label class="file-upload-box" for="photo2">
+                  <input type="file" id="photo2" accept="image/*" onchange="previewImage(event,'photoPreview2')">
+                  <img id="photoPreview2" class="upload-preview" style="display:none" alt="Vista previa 2">
+                  <div class="upload-content"><i class="fas fa-camera upload-icon"></i><span
+                      class="upload-text">Seleccionar foto</span></div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Sitios de Práctica -->
+            <div id="formGroupSiteDetails" style="display:none">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="siteCompanyName">Nombre de la Empresa</label>
+                  <input type="text" id="siteCompanyName" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="siteDepartment">Área / Departamento</label>
+                  <input type="text" id="siteDepartment" class="form-control">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="siteContactName">Nombre del Contacto</label>
+                  <input type="text" id="siteContactName" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="siteProfessor">Profesor Tutor</label>
+                  <select id="siteProfessor" class="form-control"></select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Extras de grupo -->
+            <div id="formGroupGroupExtras" style="display:none">
+              <div class="form-group"><label for="groupFeatures">Características, condiciones y elementos del
+                  grupo</label><textarea id="groupFeatures" class="form-control" rows="3"></textarea></div>
+              <div class="form-group"><label for="groupAdvisor">Asesor de cohorte</label><select id="groupAdvisor"
+                  class="form-control"></select></div>
+            </div>
+
+            <div
+              style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.5rem;border-top:1px solid #e2e8f0;padding-top:1rem">
+              <button type="button" class="btn btn-secondary btn-cancel"><i class="fas fa-times"></i> Cancelar</button>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+            </div>
+          </form>
+
+          <!-- Formulario Profesores -->
+          <form id="profForm" style="display:none;">
+            <div class="form-row">
+              <div class="form-group"><label>Nombre</label><input id="profName" class="form-control" required></div>
+              <div class="form-group"><label>Email</label><input id="profEmail" type="email" class="form-control"
+                  required></div>
+            </div>
+            <div class="form-group"><label>Foto</label><input id="profPhoto" type="file" accept="image/*"
+                class="form-control"></div>
+            <div class="form-group"><label>Especialidad</label><input id="profSpecialty" class="form-control"></div>
+            <div class="form-group"><label>Datos del CV</label><textarea id="profCv" class="form-control"
+                rows="3"></textarea></div>
+            <div class="form-group"><label>Perfil</label><textarea id="profProfile" class="form-control"
+                rows="3"></textarea></div>
+            <div class="form-group"><label>Rol en el sistema</label>
+              <select id="profRole" class="form-control">
+                <option value="profesor">Profesor</option>
+                <option value="coordinador">Coordinador</option>
+                <option value="administrador">Administrador</option>
+              </select>
+            </div>
+            <div
+              style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.5rem;border-top:1px solid #e2e8f0;padding-top:1rem">
+              <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de vista previa Acta (Mantenemos como modal por ser preview) -->
+  <div id="previewModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="previewTitle">Vista Previa del Acta</h3>
+        <button class="btn btn-secondary" onclick="hideModal('previewModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="preview-grid">
+        <div>
+          <h4>Acta PDF</h4>
+          <div class="preview-pdf-container"><iframe id="previewPdfFrame"
+              style="width:100%;height:100%;border:none"></iframe></div>
+          <div style="margin-top:.75rem">
+            <h5>Logros</h5>
+            <p id="previewLogros" class="pill" style="display:block"></p>
+            <h5>Acuerdos</h5>
+            <p id="previewAcuerdos" class="pill" style="display:block"></p>
+            <h5>Compromisos / Síntesis</h5>
+            <p id="previewSintesis" class="pill" style="display:block"></p>
+          </div>
+        </div>
+        <div>
+          <h4>Detalles</h4>
+          <div id="previewGeneralDetails"></div>
+          <h4 style="margin-top:1rem">Evidencias</h4>
+          <div id="previewPhotos"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

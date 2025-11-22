@@ -1,0 +1,9 @@
+:root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --sidebar-gradient: linear-gradient(180deg, #1a202c 0%, #2d3748 100%);
+  --bg-color: #f8fafc;
+  --text-color: #333;
+  --text-muted: #666;
+  --border-color: #e2e8f0;
+  --white: #fff;
+}
