@@ -3,6 +3,9 @@ import { showNotification } from '../../core/utils.js';
 
 let currentPlanId = null;
 
+let currentPage = 1;
+const itemsPerPage = 5;
+
 export function loadPlanTrabajo() {
     const btn = document.getElementById('btnNew');
     const btnText = document.getElementById('btnNewText');
@@ -12,35 +15,106 @@ export function loadPlanTrabajo() {
     if (btnText) btnText.textContent = 'Nuevo Plan de Trabajo';
     if (btn) btn.onclick = () => openPlanEditor('create');
 
-    const headers = ['Profesor', 'Periodo', 'Estado', 'Horas Total', 'Acciones'];
+    // Inject Filters and Excel Button
+    let controls = document.getElementById('planControls');
+    if (!controls) {
+        controls = document.createElement('div');
+        controls.id = 'planControls';
+        controls.style.cssText = 'display:flex; gap:1rem; margin-bottom:1rem; align-items:center; flex-wrap: wrap;';
+        controls.innerHTML = `
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <label style="font-weight:500;">Año:</label>
+                <select id="filterYear" class="form-control" style="width:100px;">
+                    <option value="">Todos</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <label style="font-weight:500;">Periodo:</label>
+                <input id="filterPeriod" class="form-control" placeholder="Ej: 2025-1" style="width:120px;">
+            </div>
+            <button id="btnExportExcel" class="btn btn-success" style="background:#107c41;border:none;display:flex;align-items:center;gap:0.5rem;color:white;">
+                <i class="fas fa-file-excel"></i> Exportar Excel
+            </button>
+        `;
 
+        // Insert before the table
+        const tableContainer = document.querySelector('.table-responsive') || document.querySelector('table')?.parentElement;
+        if (tableContainer) {
+            tableContainer.insertBefore(controls, tableContainer.firstChild);
+        } else {
+            // Fallback if table container not found
+            const mainContent = document.getElementById('main-content') || document.body;
+            mainContent.insertBefore(controls, mainContent.firstChild);
+        }
+
+        // Add event listeners
+        document.getElementById('filterYear').addEventListener('change', () => { currentPage = 1; renderPlanTable(); });
+        document.getElementById('filterPeriod').addEventListener('input', () => { currentPage = 1; renderPlanTable(); });
+        document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+    }
+
+    renderPlanTable();
+}
+
+function renderPlanTable() {
+    const thead = document.getElementById('tableHeader');
+    const tbody = document.getElementById('tableBody');
+    const filterYear = document.getElementById('filterYear')?.value;
+    const filterPeriod = document.getElementById('filterPeriod')?.value?.toLowerCase();
+
+    const headers = ['Profesor', 'Periodo', 'Estado', 'Horas Total', 'Acciones'];
     if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
     if (tbody) tbody.innerHTML = '';
 
-    const plans = store.workPlans || [];
+    let plans = store.workPlans || [];
+
+    // Filtering
+    if (filterYear) plans = plans.filter(p => p.year.toString() === filterYear);
+    if (filterPeriod) plans = plans.filter(p => p.period.toLowerCase().includes(filterPeriod));
 
     if (!plans.length && tbody) {
         tbody.innerHTML = `<tr><td colspan='${headers.length}' style='text-align:center;padding:1.5rem'>No hay planes registrados.</td></tr>`;
+        // Remove pagination if empty
+        const pag = document.getElementById('paginationControls');
+        if (pag) pag.remove();
         return;
     }
 
+    // Pagination
+    const totalPages = Math.ceil(plans.length / itemsPerPage);
+    if (currentPage > totalPages) currentPage = totalPages || 1;
+
+    const start = (currentPage - 1) * itemsPerPage;
+    const paginatedPlans = plans.slice(start, start + itemsPerPage);
+
     if (tbody) {
-        plans.forEach(plan => {
+        paginatedPlans.forEach(plan => {
             const prof = store.professors.find(p => p.id == plan.professorId);
             const statusText = plan.status === 'draft' ? 'Borrador' : plan.status === 'approved' ? 'Aprobado' : 'Firmado';
+            const photoUrl = prof?.photoUrl || 'https://ui-avatars.com/api/?name=' + (prof?.name || 'User') + '&background=random';
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${prof ? prof.name : 'N/A'}</td>
-                <td>${plan.period}</td>
-                <td><span class="pill">${statusText}</span></td>
-                <td>${plan.calculatedHours.total} / ${plan.generalInfo.dedication}h</td>
                 <td>
-                    <button class='btn btn-primary edit-btn' data-id="${plan.id}"><i class='fas fa-edit'></i></button>
-                    <button class='btn btn-secondary print-btn' data-id="${plan.id}"><i class='fas fa-print'></i></button>
-                    <button class='btn btn-danger delete-btn' data-id="${plan.id}"><i class='fas fa-trash'></i></button>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <img src="${photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #e2e8f0;">
+                    <div>
+                        <div style="font-weight:bold;">${prof ? prof.name : 'Profesor no encontrado'}</div>
+                        <div style="font-size:0.8rem;color:#64748b;">${prof?.email || ''}</div>
+                    </div>
+            </div>
+                </td >
+                <td>${plan.period}</td>
+                <td><span class="pill ${plan.status}">${statusText}</span></td>
+                <td><strong>${plan.calculatedHours?.total || 0}</strong> / ${plan.generalInfo?.dedication || 40}h</td>
+                <td>
+                    <button class='btn btn-primary edit-btn' data-id="${plan.id}" title="Editar"><i class='fas fa-edit'></i></button>
+                    <button class='btn btn-secondary print-btn' data-id="${plan.id}" title="Imprimir PDF"><i class='fas fa-print'></i></button>
+                    <button class='btn btn-danger delete-btn' data-id="${plan.id}" title="Eliminar"><i class='fas fa-trash'></i></button>
                 </td>
-            `;
+        `;
 
             tr.querySelector('.edit-btn').addEventListener('click', () => openPlanEditor('edit', plan.id));
             tr.querySelector('.print-btn').addEventListener('click', () => generatePDF(plan.id));
@@ -49,20 +123,94 @@ export function loadPlanTrabajo() {
             tbody.appendChild(tr);
         });
     }
+
+    renderPagination(totalPages);
+}
+
+function renderPagination(totalPages) {
+    let paginationContainer = document.getElementById('paginationControls');
+    if (!paginationContainer) {
+        paginationContainer = document.createElement('div');
+        paginationContainer.id = 'paginationControls';
+        paginationContainer.style.cssText = 'display:flex;justify-content:center;gap:0.5rem;margin-top:1rem;';
+        const table = document.querySelector('table');
+        if (table) table.parentElement.insertAdjacentElement('afterend', paginationContainer);
+    }
+
+    paginationContainer.innerHTML = '';
+
+    for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.innerText = i;
+        btn.className = `btn btn - sm ${i === currentPage ? 'btn-primary' : 'btn-secondary'} `;
+        btn.onclick = () => {
+            currentPage = i;
+            renderPlanTable();
+        };
+        paginationContainer.appendChild(btn);
+    }
+}
+
+function exportToExcel() {
+    const plans = store.workPlans || [];
+    if (!plans.length) {
+        showNotification('No hay datos para exportar', 'warning');
+        return;
+    }
+
+    let tableHTML = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="UTF-8"></head>
+        <body>
+        <table border="1">
+            <thead>
+                <tr style="background-color:#f0f0f0;font-weight:bold;">
+                    <th>Profesor</th>
+                    <th>Documento</th>
+                    <th>Periodo</th>
+                    <th>Año</th>
+                    <th>Estado</th>
+                    <th>Horas Totales</th>
+                    <th>Dedicación</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    plans.forEach(p => {
+        const prof = store.professors.find(pr => pr.id == p.professorId);
+        tableHTML += `
+            <tr>
+                <td>${prof ? prof.name : 'N/A'}</td>
+                <td>${prof ? prof.document : 'N/A'}</td>
+                <td>${p.period}</td>
+                <td>${p.year}</td>
+                <td>${p.status}</td>
+                <td>${p.calculatedHours?.total || 0}</td>
+                <td>${p.generalInfo?.dedication || 0}</td>
+            </tr>
+        `;
+    });
+    tableHTML += `</tbody></table></body></html>`;
+
+    const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "planes_trabajo.xls";
+    link.click();
 }
 
 function openPlanEditor(mode, planId = null) {
+    // FORCE REMOVE existing form to guarantee fresh state
+    const existingForm = document.getElementById('planWorkForm');
+    if (existingForm) existingForm.remove();
+
     window.showForm(mode === 'create' ? 'Nuevo Plan de Trabajo' : 'Editar Plan de Trabajo');
 
-    // Show plan editor (we'll create custom forms for this)
-    document.getElementById('dataForm').style.display = 'none';
-    document.getElementById('profForm').style.display = 'none';
-
-    let planEditorForm = document.getElementById('planWorkForm');
-    if (!planEditorForm) {
-        createPlanEditorForm();
-        planEditorForm = document.getElementById('planWorkForm');
-    }
+    // Always create fresh form
+    createPlanEditorForm();
+    setupProfessorSearch(); // Initialize search listener
+    const planEditorForm = document.getElementById('planWorkForm');
 
     planEditorForm.style.display = 'block';
 
@@ -73,6 +221,76 @@ function openPlanEditor(mode, planId = null) {
         currentPlanId = planId;
         loadPlanData(planId);
     }
+}
+
+function loadPlanData(planId) {
+    const plan = store.workPlans.find(p => p.id === planId);
+    if (!plan) return;
+
+    // Set professor using the new search UI
+    selectProfessor(plan.professorId);
+    document.getElementById('planPeriod').value = plan.period;
+    document.getElementById('planYear').value = plan.year;
+    document.getElementById('planFaculty').value = plan.generalInfo.facultyId || '';
+    populateProgramDropdown(); // Refresh programs based on faculty
+    document.getElementById('planProgram').value = plan.generalInfo.programId || '';
+    document.getElementById('planVinculationType').value = plan.generalInfo.vinculationType;
+    document.getElementById('planDedication').value = plan.generalInfo.dedication;
+
+    // Restore blocks
+    if (plan.blocks) {
+        restoreBlockItems('docenciaList', plan.blocks.docencia, 'subject');
+        restoreBlockItems('apoyoList', plan.blocks.apoyoDocencia, 'activity');
+        restoreBlockItems('gradoList', plan.blocks.trabajosGrado, 'activity');
+        restoreBlockItems('investigacionList', plan.blocks.investigacion, 'activity');
+        restoreBlockItems('pdiList', plan.blocks.pdi, 'activity');
+        restoreBlockItems('gestionList', plan.blocks.gestion, 'activity');
+    }
+
+    updateHoursSummary();
+}
+
+function restoreBlockItems(listId, items, type) {
+    const list = document.getElementById(listId);
+    if (!list || !items) return;
+    list.innerHTML = '';
+
+    items.forEach(data => {
+        const item = document.createElement('div');
+        item.className = 'plan-item';
+        item.dataset.itemData = JSON.stringify(data);
+
+        if (type === 'subject') {
+            item.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <strong>${data.code}</strong> - ${data.name}
+                        <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
+                             ${data.credits} créditos | <strong>${data.hours}h/semana</strong>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove(); updateHoursSummary();">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            item.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <strong>${data.name}</strong>
+                        <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
+                            ${data.description || 'Sin descripción'}
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }
+        list.appendChild(item);
+    });
 }
 
 function createPlanEditorForm() {
@@ -86,21 +304,20 @@ function createPlanEditorForm() {
         <div class="form-section">
             <h3>Información General</h3>
             <div class="form-row">
-                <div class="form-group" style="position:relative;">
+                <div class="form-group">
                     <label>Profesor</label>
-                    <input type="text" id="planProfessorSearch" class="form-control" placeholder="Buscar por nombre o cédula..." autocomplete="off">
-                    <input type="hidden" id="planProfessorId">
-                    <div id="planProfessorResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
-                    
-                    <!-- Info Card -->
-                    <div id="selectedProfessorInfo" style="display:none;margin-top:0.5rem;padding:0.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;font-size:0.875rem;">
-                        <div style="font-weight:bold" id="infoName"></div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.25rem;">
-                            <div>🆔 <span id="infoId"></span></div>
-                            <div>📧 <span id="infoEmail"></span></div>
-                            <div>📞 <span id="infoPhone"></span></div>
+                    <div style="position:relative;">
+                        <input type="text" id="professorSearch" class="form-control" placeholder="Buscar por nombre o documento..." autocomplete="off">
+                        <input type="hidden" id="planProfessor" required>
+                        <div id="professorSearchResults" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #e2e8f0;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:10;display:none;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <div id="selectedProfessorCard" style="display:none;margin-top:0.5rem;padding:0.75rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;align-items:center;gap:0.75rem;">
+                        <img id="selectedProfPhoto" src="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">
+                        <div>
+                            <div id="selectedProfName" style="font-weight:bold;color:#0c4a6e;"></div>
+                            <div id="selectedProfId" style="font-size:0.8rem;color:#64748b;"></div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-link" style="color:#ef4444;padding:0;margin-top:0.25rem;" onclick="window.clearProfessorSelection()">Cambiar profesor</button>
+                        <button type="button" class="btn btn-sm btn-danger" style="margin-left:auto;" onclick="clearSelectedProfessor()"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -214,9 +431,7 @@ function createPlanEditorForm() {
     });
 
     // Populate dropdowns
-    // Populate dropdowns
-    // populateProfessorDropdown(); // Replaced by search
-    setupProfessorSearch();
+    populateProfessorDropdown();
     populateFacultyDropdown();
 
     // Wire up faculty change to update program dropdown
@@ -232,22 +447,83 @@ function createPlanEditorForm() {
         e.preventDefault();
         savePlan();
     };
-
-    // Cancel button
-    const cancelBtn = planForm.querySelector('.btn-cancel');
-    if (cancelBtn) {
-        cancelBtn.onclick = () => {
-            closePlanEditor();
-            window.showDataSection('plan-trabajo');
-        };
-    }
 }
 
+// Setup Professor Search
+setupProfessorSearch();
+
+
+function setupProfessorSearch() {
+    const input = document.getElementById('professorSearch');
+    const results = document.getElementById('professorSearchResults');
+    const hiddenInput = document.getElementById('planProfessor');
+
+    if (!input) return;
+
+    input.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        if (query.length < 2) {
+            results.style.display = 'none';
+            return;
+        }
+
+        const filtered = store.professors.filter(p =>
+            p.name.toLowerCase().includes(query) ||
+            (p.document && p.document.includes(query))
+        );
+
+        if (filtered.length === 0) {
+            results.innerHTML = '<div style="padding:0.75rem;color:#64748b;">No se encontraron profesores</div>';
+        } else {
+            results.innerHTML = filtered.map(p => `
+        <div class="prof-result-item" style="padding:0.75rem;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:0.5rem;" data-id="${p.id}">
+            <img src="${p.photoUrl || 'https://ui-avatars.com/api/?name=' + p.name}" style="width:30px;height:30px;border-radius:50%;">
+                <div>
+                    <div style="font-weight:500;">${p.name}</div>
+                    <div style="font-size:0.75rem;color:#64748b;">${p.document || 'Sin documento'}</div>
+                </div>
+            </div>
+    `).join('');
+
+            results.querySelectorAll('.prof-result-item').forEach(item => {
+                item.onclick = () => selectProfessor(item.dataset.id);
+            });
+        }
+        results.style.display = 'block';
+    });
+
+    // Close results when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+            results.style.display = 'none';
+        }
+    });
+}
+
+window.selectProfessor = function (profId) {
+    const prof = store.professors.find(p => p.id == profId);
+    if (!prof) return;
+
+    document.getElementById('planProfessor').value = prof.id;
+    document.getElementById('professorSearch').style.display = 'none';
+    document.getElementById('professorSearchResults').style.display = 'none';
+
+    const card = document.getElementById('selectedProfessorCard');
+    card.style.display = 'flex';
+    document.getElementById('selectedProfName').textContent = prof.name;
+    document.getElementById('selectedProfId').textContent = prof.document || 'ID: ' + prof.id;
+    document.getElementById('selectedProfPhoto').src = prof.photoUrl || 'https://ui-avatars.com/api/?name=' + prof.name;
+};
+
+window.clearSelectedProfessor = function () {
+    document.getElementById('planProfessor').value = '';
+    document.getElementById('professorSearch').value = '';
+    document.getElementById('professorSearch').style.display = 'block';
+    document.getElementById('selectedProfessorCard').style.display = 'none';
+};
+
 function populateProfessorDropdown() {
-    const sel = document.getElementById('planProfessor');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">-- Seleccionar Profesor --</option>' +
-        store.professors.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    // Deprecated in favor of search
 }
 
 function populateFacultyDropdown() {
@@ -285,132 +561,35 @@ window.updateDedicationHours = function () {
 };
 
 function resetPlanForm() {
-    document.getElementById('planProfessorSearch').value = '';
-    document.getElementById('planProfessorId').value = '';
-    document.getElementById('selectedProfessorInfo').style.display = 'none';
+    document.getElementById('planProfessor').value = '';
     document.getElementById('planPeriod').value = '';
     document.getElementById('planYear').value = new Date().getFullYear();
+
     // Clear all blocks
-}
+    const lists = ['docenciaList', 'apoyoList', 'gradoList', 'investigacionList', 'pdiList', 'gestionList'];
+    lists.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
 
-function loadPlanData(planId) {
-    const plan = store.workPlans.find(p => p.id === planId);
-    if (!plan) return;
-
-    // Load professor info
-    const prof = store.professors.find(p => p.id == plan.professorId);
-    if (prof) {
-        selectProfessor(prof);
-    } else {
-        document.getElementById('planProfessorId').value = plan.professorId;
-        document.getElementById('planProfessorSearch').value = 'Profesor no encontrado';
-    }
-    document.getElementById('planPeriod').value = plan.period;
-    document.getElementById('planYear').value = plan.year;
-    document.getElementById('planFaculty').value = plan.generalInfo.facultyId || '';
-    populateProgramDropdown(); // Refresh programs based on faculty
-    document.getElementById('planProgram').value = plan.generalInfo.programId || '';
-    document.getElementById('planVinculationType').value = plan.generalInfo.vinculationType;
-    document.getElementById('planDedication').value = plan.generalInfo.dedication;
-
-    // Load blocks - render saved items
-    loadSavedBlocks(plan.blocks);
     updateHoursSummary();
 }
 
-function loadSavedBlocks(blocks) {
-    // Clear all lists first
-    const lists = {
-        docencia: document.getElementById('docenciaList'),
-        apoyoDocencia: document.getElementById('apoyoList'),
-        trabajosGrado: document.getElementById('gradoList'),
-        investigacion: document.getElementById('investigacionList'),
-        pdi: document.getElementById('pdiList'),
-        gestion: document.getElementById('gestionList')
-    };
 
-    Object.values(lists).forEach(list => {
-        if (list) list.innerHTML = '';
-    });
-
-    // Load docencia (subjects)
-    if (blocks.docencia && blocks.docencia.length) {
-        blocks.docencia.forEach(subjectId => {
-            const subject = store.subjects.find(s => s.id === subjectId);
-            if (subject) {
-                const program = store.programs.find(p => p.id === subject.programId);
-                const item = document.createElement('div');
-                item.className = 'plan-item';
-                item.dataset.id = subjectId; // Store ID
-                item.style.cssText = 'padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:0.75rem;';
-                item.innerHTML = `
-                    <div style="display:flex;justify-content:space-between;align-items:start;">
-                        <div>
-                            <strong>${subject.code}</strong> - ${subject.name}
-                            <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
-                                ${program ? program.name : 'N/A'} | ${subject.credits} créditos | <strong>${subject.hoursPerWeek}h/semana</strong>
-                            </div>
-                        </div>
-                        <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                `;
-                lists.docencia.appendChild(item);
-            }
-        });
-    }
-
-    // Load other activities
-    const activityBlocks = [
-        { key: 'apoyoDocencia', list: lists.apoyoDocencia },
-        { key: 'trabajosGrado', list: lists.trabajosGrado },
-        { key: 'investigacion', list: lists.investigacion },
-        { key: 'pdi', list: lists.pdi },
-        { key: 'gestion', list: lists.gestion }
-    ];
-
-    activityBlocks.forEach(({ key, list }) => {
-        if (blocks[key] && blocks[key].length && list) {
-            blocks[key].forEach(activityId => {
-                const activity = store.planActivities.find(a => a.id === activityId);
-                if (activity) {
-                    const item = document.createElement('div');
-                    item.className = 'plan-item';
-                    item.dataset.id = activityId; // Store ID
-                    item.style.cssText = 'padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:0.75rem;';
-                    item.innerHTML = `
-                        <div style="display:flex;justify-content:space-between;align-items:start;">
-                            <div>
-                                <strong>${activity.name}</strong>
-                                <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
-                                    ${activity.description || 'Sin descripción'}
-                                </div>
-                            </div>
-                            <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    `;
-                    list.appendChild(item);
-                }
-            });
-        }
-    });
-}
 
 function savePlan() {
-    // Extract IDs from DOM items
-    const extractIds = (listId) => {
+    // Helper to scrape items from DOM
+    const getItemsFromList = (listId) => {
         const list = document.getElementById(listId);
         if (!list) return [];
-        const items = list.querySelectorAll('.plan-item[data-id]');
-        return Array.from(items).map(item => item.dataset.id);
+        return Array.from(list.querySelectorAll('.plan-item')).map(item => {
+            return JSON.parse(item.dataset.itemData || '{ }');
+        });
     };
 
     const planData = {
         id: currentPlanId,
-        professorId: parseInt(document.getElementById('planProfessorId').value),
+        professorId: document.getElementById('planProfessor').value,
         period: document.getElementById('planPeriod').value,
         year: parseInt(document.getElementById('planYear').value),
         status: 'draft',
@@ -421,12 +600,12 @@ function savePlan() {
             dedication: parseInt(document.getElementById('planDedication').value)
         },
         blocks: {
-            docencia: extractIds('docenciaList'),
-            apoyoDocencia: extractIds('apoyoList'),
-            trabajosGrado: extractIds('gradoList'),
-            investigacion: extractIds('investigacionList'),
-            pdi: extractIds('pdiList'),
-            gestion: extractIds('gestionList')
+            docencia: getItemsFromList('docenciaList'),
+            apoyoDocencia: getItemsFromList('apoyoList'),
+            trabajosGrado: getItemsFromList('gradoList'),
+            investigacion: getItemsFromList('investigacionList'),
+            pdi: getItemsFromList('pdiList'),
+            gestion: getItemsFromList('gestionList')
         },
         calculatedHours: calculateTotalHours()
     };
@@ -440,23 +619,16 @@ function savePlan() {
         showNotification('Plan creado');
     }
 
-    closePlanEditor();
-    window.showDataSection('plan-trabajo');
-}
-
-function closePlanEditor() {
-    // Remove the plan editor form
+    // CRITICAL: Remove the form from DOM
     const planForm = document.getElementById('planWorkForm');
     if (planForm) planForm.remove();
 
-    // Restore standard forms visibility
-    const dataForm = document.getElementById('dataForm');
-    const profForm = document.getElementById('profForm');
-    if (dataForm) dataForm.style.display = 'block';
-    if (profForm) profForm.style.display = 'none';
+    window.showDataSection('plan-trabajo');
 }
 
 function calculateTotalHours() {
+    console.log('🧮 calculateTotalHours iniciando...');
+
     // Calculate hours from each block by counting items
     const docenciaList = document.getElementById('docenciaList');
     const apoyoList = document.getElementById('apoyoList');
@@ -464,6 +636,15 @@ function calculateTotalHours() {
     const investigacionList = document.getElementById('investigacionList');
     const pdiList = document.getElementById('pdiList');
     const gestionList = document.getElementById('gestionList');
+
+    console.log('📋 Listas encontradas:', {
+        docencia: docenciaList ? `SÍ(${docenciaList.querySelectorAll('.plan-item').length} items)` : 'NO',
+        apoyo: apoyoList ? `SÍ(${apoyoList.querySelectorAll('.plan-item').length} items)` : 'NO',
+        grado: gradoList ? `SÍ(${gradoList.querySelectorAll('.plan-item').length} items)` : 'NO',
+        investigacion: investigacionList ? `SÍ(${investigacionList.querySelectorAll('.plan-item').length} items)` : 'NO',
+        pdi: pdiList ? `SÍ(${pdiList.querySelectorAll('.plan-item').length} items)` : 'NO',
+        gestion: gestionList ? `SÍ(${gestionList.querySelectorAll('.plan-item').length} items)` : 'NO'
+    });
 
     // Count hours from subjects in docencia block
     let docenciaHours = 0;
@@ -474,34 +655,30 @@ function calculateTotalHours() {
             const text = item.textContent;
             const match = text.match(/(\d+)h\/semana/);
             if (match) {
-                docenciaHours += parseInt(match[1]);
+                const hours = parseInt(match[1]);
+                console.log(`  ✓ Asignatura encontrada: ${hours} h / semana`);
+                docenciaHours += hours;
             }
         });
     }
 
     // For activities, we'll count 2 hours per activity as default
     // (in future, activities can have their own hour values)
-    const countActivityHours = (list, name) => {
-        if (!list) {
-            console.log(`⚠️ Lista ${name} no encontrada`);
-            return 0;
-        }
+    const countActivityHours = (list) => {
+        if (!list) return 0;
         const items = list.querySelectorAll('.plan-item');
-        console.log(`📋 ${name}: ${items.length} items = ${items.length * 2}h`);
         return items.length * 2; // 2 hours per activity
     };
 
-    const apoyoHours = countActivityHours(apoyoList, 'Apoyo');
-    const gradoHours = countActivityHours(gradoList, 'Grado');
-    const investigacionHours = countActivityHours(investigacionList, 'Investigación');
-    const pdiHours = countActivityHours(pdiList, 'PDI');
-    const gestionHours = countActivityHours(gestionList, 'Gestión');
+    const apoyoHours = countActivityHours(apoyoList);
+    const gradoHours = countActivityHours(gradoList);
+    const investigacionHours = countActivityHours(investigacionList);
+    const pdiHours = countActivityHours(pdiList);
+    const gestionHours = countActivityHours(gestionList);
 
     const total = docenciaHours + apoyoHours + gradoHours + investigacionHours + pdiHours + gestionHours;
 
-    console.log(`📊 Total calculado: Docencia=${docenciaHours}h, Apoyo=${apoyoHours}h, Grado=${gradoHours}h, Investigación=${investigacionHours}h, PDI=${pdiHours}h, Gestión=${gestionHours}h, TOTAL=${total}h`);
-
-    return {
+    const result = {
         docencia: docenciaHours,
         apoyoDocencia: apoyoHours,
         trabajosGrado: gradoHours,
@@ -510,98 +687,9 @@ function calculateTotalHours() {
         gestion: gestionHours,
         total: total
     };
-}
 
-function updateHoursSummary() {
-    const summary = document.getElementById('hoursSummary');
-    const alert = document.getElementById('hoursAlert');
-    if (!summary) return;
-
-    const hours = calculateTotalHours();
-    const dedication = parseInt(document.getElementById('planDedication').value) || 40;
-    const percentage = Math.round((hours.total / dedication) * 100);
-
-    // Determine color based on usage
-    let statusColor = '#10b981'; // green
-    let statusText = 'Disponible';
-    if (percentage >= 100) {
-        statusColor = '#ef4444'; // red
-        statusText = 'Excedido';
-    } else if (percentage >= 80) {
-        statusColor = '#f59e0b'; // amber
-        statusText = 'Cerca del límite';
-    }
-
-    summary.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
-            <div style="text-align: center; padding: 0.75rem; background: #f0fdf4; border-radius: 6px;">
-                <div style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">Docencia</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #059669;">${hours.docencia}h</div>
-            </div>
-            <div style="text-align: center; padding: 0.75rem; background: #eff6ff; border-radius: 6px;">
-                <div style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">Apoyo</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2563eb;">${hours.apoyoDocencia}h</div>
-            </div>
-            <div style="text-align: center; padding: 0.75rem; background: #fef3c7; border-radius: 6px;">
-                <div style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">Trabajos Grado</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${hours.trabajosGrado}h</div>
-            </div>
-            <div style="text-align: center; padding: 0.75rem; background: #f3e8ff; border-radius: 6px;">
-                <div style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">Investigación</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #9333ea;">${hours.investigacion}h</div>
-            </div>
-            <div style="text-align: center; padding: 0.75rem; background: #fce7f3; border-radius: 6px;">
-                <div style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">PDI</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #db2777;">${hours.pdi}h</div>
-            </div>
-            <div style="text-align: center; padding: 0.75rem; background: #ecfccb; border-radius: 6px;">
-                <div style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">Gestión</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #65a30d;">${hours.gestion}h</div>
-            </div>
-        </div>
-        
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.25rem; border-radius: 8px; color: white; text-align: center;">
-            <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Asignado</div>
-            <div style="font-size: 2.5rem; font-weight: 700; margin-bottom: 0.25rem;">${hours.total}h <span style="font-size: 1.5rem; opacity: 0.8;">/ ${dedication}h</span></div>
-            <div style="margin-top: 0.75rem;">
-                <div style="background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden;">
-                    <div style="background: ${statusColor}; height: 100%; width: ${Math.min(percentage, 100)}%; transition: width 0.3s;"></div>
-                </div>
-                <div style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.9;">${percentage}% utilizado - ${statusText}</div>
-            </div>
-        </div>
-    `;
-
-    if (hours.total > dedication) {
-        alert.innerHTML = `
-            <div class="alert alert-danger" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 1.25rem;"></i>
-                <span><strong>Atención:</strong> Las horas asignadas (${hours.total}h) exceden la dedicación permitida (${dedication}h)</span>
-            </div>
-        `;
-    } else if (hours.total >= dedication * 0.8) {
-        alert.innerHTML = `
-            <div style="margin-top: 1rem; padding: 0.75rem; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; color: #92400e; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-info-circle" style="font-size: 1.25rem;"></i>
-                <span>Te estás acercando al límite de horas (${dedication}h disponibles, ${dedication - hours.total}h restantes)</span>
-            </div>
-        `;
-    } else {
-        alert.innerHTML = '';
-    }
-}
-
-function deletePlan(planId) {
-    if (confirm('¿Está seguro de eliminar este plan de trabajo?')) {
-        store.workPlans = store.workPlans.filter(p => p.id !== planId);
-        loadPlanTrabajo();
-        showNotification('Plan eliminado');
-    }
-}
-
-function generatePDF(planId) {
-    // TODO: Open print view
-    showNotification('Funcionalidad de PDF en desarrollo');
+    console.log('✅ Resultado del cálculo:', result);
+    return result;
 }
 
 // ===== ADD ITEMS FUNCTIONS =====
@@ -633,18 +721,20 @@ window.addGestionItem = () => {
 function openSubjectSelectorModal() {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 700px;">
-            <div class="modal-header">
-                <h3>Seleccionar Asignatura</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="text" id="subjectSelector-search" class="form-control" placeholder="Buscar por código o nombre..." style="margin-bottom: 1rem;">
-                <div id="subjectSelector-list" style="max-height: 400px; overflow-y: auto;"></div>
-            </div>
-        </div>
-    `;
+                    <div class="modal-content" style="background:white;border-radius:12px;max-width:700px;width:90%;max-height:80vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                        <div class="modal-header" style="padding:1.5rem;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+                            <h3 style="margin:0;font-size:1.25rem;color:#1a202c;">Seleccionar Asignatura</h3>
+                            <button class="modal-close" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#718096;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background 0.2s;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='none'">&times;</button>
+                        </div>
+                        <div class="modal-body" style="padding:1.5rem;">
+                            <input type="text" id="subjectSelector-search" class="form-control" placeholder="Buscar por código o nombre..." style="margin-bottom:1rem;width:100%;padding:0.75rem;border:2px solid #e2e8f0;border-radius:8px;font-size:1rem;">
+                                <div id="subjectSelector-list" style="max-height:400px;overflow-y:auto;"></div>
+                        </div>
+                    </div>
+                    `;
 
     document.body.appendChild(modal);
 
@@ -660,6 +750,7 @@ function openSubjectSelectorModal() {
         renderSubjectList(e.target.value);
     };
 }
+
 
 function renderSubjectList(query = '') {
     const listDiv = document.getElementById('subjectSelector-list');
@@ -679,18 +770,18 @@ function renderSubjectList(query = '') {
     listDiv.innerHTML = filtered.map(subj => {
         const program = store.programs.find(p => p.id === subj.programId);
         return `
-            <div class="subject-item" style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s;" data-id="${subj.id}">
-                <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <div>
-                        <strong>${subj.code}</strong> - ${subj.name}
-                        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
-                            ${program ? program.name : 'N/A'} | ${subj.credits} créditos | ${subj.hoursPerWeek} horas/semana
+                    <div class="subject-item" style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s;" data-id="${subj.id}">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <strong>${subj.code}</strong> - ${subj.name}
+                                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                    ${program ? program.name : 'N/A'} | ${subj.credits} créditos | ${subj.hoursPerWeek} horas/semana
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.75rem;">Agregar</button>
                         </div>
                     </div>
-                    <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.75rem;">Agregar</button>
-                </div>
-            </div>
-        `;
+                    `;
     }).join('');
 
     // Add click handlers
@@ -704,51 +795,71 @@ function renderSubjectList(query = '') {
 }
 
 function addSubjectToplan(subjectId) {
+    console.log('➕ addSubjectToplan llamada con ID:', subjectId);
+
     const subject = store.subjects.find(s => s.id === subjectId);
-    if (!subject) return;
+    if (!subject) {
+        console.error('❌ No se encontró la asignatura con ID:', subjectId);
+        return;
+    }
+
+    console.log('✓ Asignatura encontrada:', subject);
 
     const program = store.programs.find(p => p.id === subject.programId);
     const docenciaList = document.getElementById('docenciaList');
 
     const item = document.createElement('div');
     item.className = 'plan-item';
-    item.dataset.id = subjectId; // Store ID for saving later
     item.style.cssText = 'padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:0.75rem;';
+
+    // Store data for scraping
+    item.dataset.itemData = JSON.stringify({
+        id: subject.id,
+        code: subject.code,
+        name: subject.name,
+        hours: subject.hoursPerWeek,
+        credits: subject.credits
+    });
+
     item.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:start;">
-            <div>
-                <strong>${subject.code}</strong> - ${subject.name}
-                <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
-                    ${program ? program.name : 'N/A'} | ${subject.credits} créditos | <strong>${subject.hoursPerWeek}h/semana</strong>
-                </div>
-            </div>
-            <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `;
+                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                        <div>
+                            <strong>${subject.code}</strong> - ${subject.name}
+                            <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
+                                ${program ? program.name : 'N/A'} | ${subject.credits} créditos | <strong>${subject.hoursPerWeek}h/semana</strong>
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove(); updateHoursSummary();">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    `;
 
     docenciaList.appendChild(item);
-    // Wait for DOM to update before recalculating hours
-    requestAnimationFrame(() => updateHoursSummary());
+    console.log('✓ Item agregado al DOM');
+
+    updateHoursSummary();
+    console.log('✓ updateHoursSummary llamada');
+
     showNotification(`Asignatura "${subject.name}" agregada`);
 }
+
 
 // Activity Selector Modal
 function openActivitySelectorModal(activityType) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>Seleccionar Actividad - ${activityType}</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="activitySelector-list" style="max-height: 400px; overflow-y: auto;"></div>
-            </div>
-        </div>
-    `;
+                    <div class="modal-content" style="max-width: 600px;">
+                        <div class="modal-header">
+                            <h3>Seleccionar Actividad - ${activityType}</h3>
+                            <button class="modal-close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="activitySelector-list" style="max-height: 400px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                    `;
 
     document.body.appendChild(modal);
 
@@ -772,18 +883,18 @@ function renderActivityList(activityType) {
     }
 
     listDiv.innerHTML = activities.map(act => `
-        <div class="activity-item" style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s;" data-id="${act.id}">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div>
-                    <strong>${act.name}</strong>
-                    <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
-                        ${act.description || 'Sin descripción'}
+                    <div class="activity-item" style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s;" data-id="${act.id}">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <strong>${act.name}</strong>
+                                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                    ${act.description || 'Sin descripción'}
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.75rem;">Agregar</button>
+                        </div>
                     </div>
-                </div>
-                <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.75rem;">Agregar</button>
-            </div>
-        </div>
-    `).join('');
+                    `).join('');
 
     // Add click handlers
     listDiv.querySelectorAll('.activity-item').forEach(item => {
@@ -814,105 +925,94 @@ function addActivityToPlan(activityId, activityType) {
 
     const item = document.createElement('div');
     item.className = 'plan-item';
-    item.dataset.id = activityId; // Store ID for saving later
     item.style.cssText = 'padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:0.75rem;';
+
+    // Store data for scraping
+    item.dataset.itemData = JSON.stringify({
+        id: activity.id,
+        name: activity.name,
+        description: activity.description,
+        hours: 2, // Default hours, should be dynamic
+        type: activityType
+    });
+
     item.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:start;">
-            <div>
-                <strong>${activity.name}</strong>
-                <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
-                    ${activity.description || 'Sin descripción'}
-                </div>
-            </div>
-            <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `;
+                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                        <div>
+                            <strong>${activity.name}</strong>
+                            <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
+                                ${activity.description || 'Sin descripción'}
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    `;
 
     targetList.appendChild(item);
-    // Wait for DOM to update before recalculating hours
-    requestAnimationFrame(() => updateHoursSummary());
     showNotification(`Actividad "${activity.name}" agregada`);
+    updateHoursSummary();
 }
 
-// Expose updateHoursSummary globally for onclick handlers
-window.updateHoursSummary = updateHoursSummary;
-window.closePlanEditor = closePlanEditor;
+// VERSION MEJORADA DEL RESUMEN (Basada en la imagen)
+window.updateHoursSummary = function () {
+    console.log('🔄 updateHoursSummary llamada');
 
-// --- Search Logic ---
+    const summary = document.getElementById('hoursSummary');
+    const alert = document.getElementById('hoursAlert');
 
-function setupProfessorSearch() {
-    const input = document.getElementById('planProfessorSearch');
-    const results = document.getElementById('planProfessorResults');
+    if (!summary) return;
 
-    if (!input || !results) return;
+    const hours = calculateTotalHours();
 
-    input.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        if (term.length < 2) {
-            results.style.display = 'none';
-            return;
-        }
+    // Estilos basados en la imagen proporcionada
+    summary.innerHTML = `
+                    <div style="border: 1px solid #3b82f6; border-radius: 8px; overflow: hidden; font-family: system-ui, -apple-system, sans-serif;">
+                        <div style="background: #eff6ff; padding: 1rem;">
+                            <h4 style="margin: 0 0 1rem 0; color: #0f172a; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                📊 Resumen de Horas
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; font-size: 0.95rem; color: #1e293b;">
+                                <div><strong>Docencia:</strong> ${hours.docencia}h</div>
+                                <div><strong>Apoyo:</strong> ${hours.apoyoDocencia}h</div>
+                                <div><strong>Grado:</strong> ${hours.trabajosGrado}h</div>
+                                <div><strong>Investigación:</strong> ${hours.investigacion}h</div>
+                                <div><strong>PDI:</strong> ${hours.pdi}h</div>
+                                <div><strong>Gestión:</strong> ${hours.gestion}h</div>
+                            </div>
+                        </div>
+                        <div style="background: #1e3a8a; color: white; padding: 0.75rem; text-align: center; font-size: 1.1rem; font-weight: bold;">
+                            TOTAL: ${hours.total} horas
+                        </div>
+                    </div>
+                    `;
 
-        const matches = store.professors.filter(p =>
-            (p.name && p.name.toLowerCase().includes(term)) ||
-            (p.identification && p.identification.includes(term)) ||
-            (p.firstName && p.firstName.toLowerCase().includes(term)) ||
-            (p.lastName1 && p.lastName1.toLowerCase().includes(term))
-        );
-
-        if (matches.length > 0) {
-            results.innerHTML = matches.map(p => `
-                <div class="search-item" style="padding:0.5rem;cursor:pointer;border-bottom:1px solid #eee;" 
-                     onmouseover="this.style.background='#f3f4f6'" 
-                     onmouseout="this.style.background='white'"
-                     onclick="window.selectProfessor(${p.id})">
-                    <div style="font-weight:bold">${p.name}</div>
-                    <div style="font-size:0.75rem;color:#666">CC: ${p.identification || 'N/A'} | ${p.email}</div>
-                </div>
-            `).join('');
-            results.style.display = 'block';
-        } else {
-            results.innerHTML = '<div style="padding:0.5rem;color:#666">No se encontraron resultados</div>';
-            results.style.display = 'block';
-        }
-    });
-
-    // Hide results when clicking outside
-    document.addEventListener('click', (e) => {
-        if (e.target !== input && e.target !== results) {
-            results.style.display = 'none';
-        }
-    });
-}
-
-window.selectProfessor = function (idOrObj) {
-    let prof = idOrObj;
-    if (typeof idOrObj !== 'object') {
-        prof = store.professors.find(p => p.id == idOrObj);
+    // Validación de horas (opcional, pero útil)
+    const dedication = parseInt(document.getElementById('planDedication').value) || 40;
+    if (hours.total > dedication) {
+        if (alert) alert.innerHTML = `<div class="alert alert-warning" style="margin-top:1rem; color: #854d0e; background-color: #fef9c3; border: 1px solid #fde047; padding: 0.75rem; border-radius: 0.375rem;">⚠️ Las horas totales (${hours.total}) superan la dedicación permitida (${dedication}).</div>`;
+    } else if (hours.total < dedication) {
+        if (alert) alert.innerHTML = `<div class="alert alert-info" style="margin-top:1rem; color: #1e40af; background-color: #dbeafe; border: 1px solid #bfdbfe; padding: 0.75rem; border-radius: 0.375rem;">ℹ️ Aún tienes horas disponibles (${dedication - hours.total}).</div>`;
+    } else {
+        if (alert) alert.innerHTML = `<div class="alert alert-success" style="margin-top:1rem; color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: 0.75rem; border-radius: 0.375rem;">✅ Cumple con la dedicación exacta.</div>`;
     }
-
-    if (!prof) return;
-
-    document.getElementById('planProfessorId').value = prof.id;
-    document.getElementById('planProfessorSearch').value = prof.name;
-    document.getElementById('planProfessorResults').style.display = 'none';
-
-    // Show Info Card
-    document.getElementById('infoName').textContent = prof.name;
-    document.getElementById('infoId').textContent = prof.identification || 'N/A';
-    document.getElementById('infoEmail').textContent = prof.email || 'N/A';
-    document.getElementById('infoPhone').textContent = prof.phone || 'N/A';
-
-    document.getElementById('selectedProfessorInfo').style.display = 'block';
-    document.getElementById('planProfessorSearch').style.display = 'none'; // Hide search input
 };
 
-window.clearProfessorSelection = function () {
-    document.getElementById('planProfessorId').value = '';
-    document.getElementById('planProfessorSearch').value = '';
-    document.getElementById('planProfessorSearch').style.display = 'block';
-    document.getElementById('selectedProfessorInfo').style.display = 'none';
-    document.getElementById('planProfessorSearch').focus();
-};
+function deletePlan(planId) {
+    if (confirm('¿Está seguro de eliminar este plan de trabajo?')) {
+        store.workPlans = store.workPlans.filter(p => p.id !== planId);
+        loadPlanTrabajo();
+        showNotification('Plan eliminado');
+    }
+}
+
+/*
+function generatePDF(planId) {
+    // ... content ...
+}
+
+function renderBlockForPDFHorizontal(title, activities, headers) {
+    // ... content ...
+}
+*/
