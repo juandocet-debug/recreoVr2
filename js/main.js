@@ -76,8 +76,11 @@ window.showDataSection = (sectionType) => {
     if (plansGridContainer) plansGridContainer.remove();
 
     // Reset Table Display (fix for Plan Mejoramiento grid mode)
+    const dataTable = document.getElementById('dataTable');
     const tableHeader = document.getElementById('tableHeader');
     const tableBody = document.getElementById('tableBody');
+
+    if (dataTable) dataTable.style.display = '';
     if (tableHeader) tableHeader.style.display = '';
     if (tableBody) {
         tableBody.style.display = '';
@@ -128,12 +131,12 @@ window.showForm = (title) => {
         if (f) f.style.display = 'none';
     });
 
-    // 2. Eliminar formularios dinámicos inyectados previamente
-    // Eliminar cualquier form que no sea estático para evitar acumulaciones
-    const forms = formSection.querySelectorAll('form');
-    forms.forEach(f => {
-        if (!staticForms.includes(f.id)) {
-            f.remove();
+    // 2. Eliminar formularios dinámicos inyectados previamente (Aggressive Cleanup)
+    // Keep only the header and static forms
+    const keptIds = ['section-header', 'dataForm', 'profForm'];
+    Array.from(formSection.children).forEach(child => {
+        if (!keptIds.includes(child.id) && !child.classList.contains('section-header')) {
+            child.remove();
         }
     });
 
