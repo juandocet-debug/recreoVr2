@@ -8,6 +8,7 @@ import { loadUsuarios } from './modules/usuarios/usuarios.controller.js';
 import { loadDocumentos } from './modules/documentos/documentos.controller.js';
 import { loadGrupos } from './modules/grupos/grupos.controller.js';
 import { loadPlanTrabajo } from './modules/plan-trabajo/plan-trabajo.controller.js';
+import { loadPlanMejoramiento } from './modules/plan-mejoramiento/plan-mejoramiento.controller.js';
 import { loadUtilidades } from './modules/utilidades/utilidades.controller.js';
 import { store } from './core/store.js';
 import { previewImage, previewFileName } from './core/utils.js';
@@ -64,6 +65,25 @@ window.showDataSection = (sectionType) => {
     const searchBox = document.getElementById('subjectSearchBox');
     if (searchBox) searchBox.remove();
 
+    // Clean up Plan de Mejoramiento elements
+    const pmTabs = document.getElementById('pmTabs');
+    if (pmTabs) pmTabs.remove();
+    const planFiltersBar = document.getElementById('planFiltersBar');
+    if (planFiltersBar) planFiltersBar.remove();
+    const planDetailsBanner = document.getElementById('planDetailsBanner');
+    if (planDetailsBanner) planDetailsBanner.remove();
+    const plansGridContainer = document.getElementById('plansGridContainer');
+    if (plansGridContainer) plansGridContainer.remove();
+
+    // Reset Table Display (fix for Plan Mejoramiento grid mode)
+    const tableHeader = document.getElementById('tableHeader');
+    const tableBody = document.getElementById('tableBody');
+    if (tableHeader) tableHeader.style.display = '';
+    if (tableBody) {
+        tableBody.style.display = '';
+        tableBody.className = ''; // Remove grid class
+    }
+
     // Aggressive Form Cleanup
     // Remove ANY form that is not one of the static ones
     const staticForms = ['dataForm', 'profForm'];
@@ -89,6 +109,7 @@ window.showDataSection = (sectionType) => {
         case 'roles-permisos': loadUsuarios(); break;
         case 'sites': loadPracticas(); break;
         case 'plan-trabajo': loadPlanTrabajo(); break;
+        case 'plan-mejoramiento': loadPlanMejoramiento(); break;
         case 'utilidades': loadUtilidades(); break;
         default: console.warn('Unknown section:', sectionType);
     }
