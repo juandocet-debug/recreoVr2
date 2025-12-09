@@ -8,8 +8,8 @@ let usuariosTable;
 let currentProfessorId = null;
 
 function openProfModal(mode, id = null) {
-  console.log('=== ABRIENDO FORMULARIO PREMIUM DE PROFESOR ===');
-  window.showForm(mode === 'create' ? 'Nuevo Profesor' : 'Editar Profesor');
+  console.log('=== ABRIENDO FORMULARIO PREMIUM DE USUARIO ===');
+  window.showForm(mode === 'create' ? 'Nuevo Usuario' : 'Editar Usuario');
 
   currentProfessorId = id;
 
@@ -153,6 +153,7 @@ function injectPremiumForm() {
               <option value="profesor">Profesor</option>
               <option value="coordinador">Coordinador</option>
               <option value="administrador">Administrador</option>
+              <option value="estudiante">Estudiante</option>
             </select>
           </div>
         </div>
@@ -298,7 +299,7 @@ async function saveProfessor() {
     await loadingPromise;
 
     if (response.ok) {
-      await window.showCustomAlert('¡Guardado!', 'Profesor guardado exitosamente', 'success');
+      await window.showCustomAlert('¡Guardado!', 'Usuario guardado exitosamente', 'success');
 
       // Reload data manually
       try {
@@ -317,7 +318,7 @@ async function saveProfessor() {
             document.getElementById('dashboard').style.display = 'none';
             document.getElementById('dataSection').style.display = 'block';
             document.getElementById('formSection').style.display = 'none';
-            document.getElementById('sectionTitle').textContent = 'Gestión de Profesores';
+            document.getElementById('sectionTitle').textContent = 'Gestión de Usuarios';
           }
         }
       } catch (err) {
@@ -368,7 +369,7 @@ async function deleteProf(id) {
       await loadingPromise;
 
       if (response.ok) {
-        await window.showCustomAlert('¡Eliminado!', 'El profesor ha sido eliminado.', 'success');
+        await window.showCustomAlert('¡Eliminado!', 'El usuario ha sido eliminado.', 'success');
 
         // Reload data manually
         try {
@@ -411,7 +412,7 @@ export function loadUsuarios() {
 
   if (thead) thead.innerHTML = '';
   if (tbody) tbody.innerHTML = '';
-  if (btnText) btnText.textContent = 'Nuevo Profesor';
+  if (btnText) btnText.textContent = 'Nuevo Usuario';
   if (btn) btn.onclick = () => window.openProfModal('create');
 
   if (usuariosTable) {
@@ -468,7 +469,7 @@ window.showProfessorProfile = function (profId) {
   modal.innerHTML = `
     <div class="modal-content" style="max-width:500px;">
       <div class="modal-header">
-        <h3>Perfil del Profesor</h3>
+        <h3>Perfil del Usuario</h3>
         <button class="modal-close">&times;</button>
       </div>
       <div class="modal-body" style="text-align:center;">

@@ -87,6 +87,24 @@ function initDb() {
                 });
             }
         });
+        // Actas Table
+        db.run(`CREATE TABLE IF NOT EXISTS actas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT,
+            category TEXT,
+            date TEXT,
+            startTime TEXT,
+            endTime TEXT,
+            location TEXT,
+            dependencies TEXT,
+            content TEXT,
+            commitments TEXT,
+            nextMeeting TEXT,
+            groupId TEXT,
+            signatures TEXT
+        )`, (err) => {
+            if (err) console.error("Error creating table actas:", err);
+        });
     });
 }
 
