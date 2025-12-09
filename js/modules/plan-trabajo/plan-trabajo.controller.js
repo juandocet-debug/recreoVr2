@@ -662,12 +662,20 @@ function calculateTotalHours() {
         });
     }
 
-    // For activities, we'll count 2 hours per activity as default
-    // (in future, activities can have their own hour values)
+    // For activities, we'll count hours from the item data
     const countActivityHours = (list) => {
         if (!list) return 0;
         const items = list.querySelectorAll('.plan-item');
-        return items.length * 2; // 2 hours per activity
+        let total = 0;
+        items.forEach(item => {
+            try {
+                const data = JSON.parse(item.dataset.itemData || '{}');
+                total += (parseInt(data.hours) || 0);
+            } catch (e) {
+                console.error('Error parsing item data for hours:', e);
+            }
+        });
+        return total;
     };
 
     const apoyoHours = countActivityHours(apoyoList);
@@ -698,7 +706,7 @@ window.addDocenciaItem = () => {
 };
 
 window.addApoyoItem = () => {
-    openActivitySelectorModal('Apoyo Docencia');
+    openLinkedActivityModal('Apoyo Docencia');
 };
 
 window.addGradoItem = () => {
@@ -706,15 +714,15 @@ window.addGradoItem = () => {
 };
 
 window.addInvestigacionItem = () => {
-    openActivitySelectorModal('Investigación');
+    openLinkedActivityModal('Investigación');
 };
 
 window.addPDIItem = () => {
-    openActivitySelectorModal('PDI');
+    openLinkedActivityModal('PDI');
 };
 
 window.addGestionItem = () => {
-    openActivitySelectorModal('Gestión');
+    openLinkedActivityModal('Gestión');
 };
 
 // Subject Selector Modal
@@ -845,74 +853,213 @@ function addSubjectToplan(subjectId) {
 }
 
 
-// Activity Selector Modal
-function openActivitySelectorModal(activityType) {
+// Linked Activity Modal
+function openLinkedActivityModal(activityType) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-                    <div class="modal-content" style="max-width: 600px;">
-                        <div class="modal-header">
-                            <h3>Seleccionar Actividad - ${activityType}</h3>
-                            <button class="modal-close">&times;</button>
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>Agregar Actividad - ${activityType}</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="linkedActivityForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Facultad</label>
+                            <select id="linkFaculty" class="form-control" required></select>
                         </div>
-                        <div class="modal-body">
-                            <div id="activitySelector-list" style="max-height: 400px; overflow-y: auto;"></div>
+                        <div class="form-group">
+                            <label>Programa</label>
+                            <select id="linkProgram" class="form-control" required disabled></select>
                         </div>
                     </div>
-                    `;
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Plan de Mejoramiento</label>
+                            <select id="linkPlan" class="form-control" required disabled></select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Factor</label>
+                            <select id="linkFactor" class="form-control" required disabled></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Actividad del Plan</label>
+                            <select id="linkActivity" class="form-control" required disabled></select>
+                        </div>
+                    </div>
+
+                    <hr style="margin: 1.5rem 0; border-color: #e2e8f0;">
+
+                    <div class="form-group">
+                        <label>Acciones Específicas</label>
+                        <textarea id="linkActions" class="form-control" rows="2" placeholder="Describe las acciones puntuales a realizar..." required></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Horas Semanales</label>
+                            <input type="number" id="linkHours" class="form-control" min="1" max="40" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Forma de Entrega</label>
+                        <div id="linkDeliveryContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;padding:0.5rem;border:1px solid #e2e8f0;border-radius:6px;max-height:150px;overflow-y:auto;">
+                            <!-- Checkboxes injected here -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Medios de Verificación</label>
+                        <div id="linkVerificationContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;padding:0.5rem;border:1px solid #e2e8f0;border-radius:6px;max-height:150px;overflow-y:auto;">
+                            <!-- Checkboxes injected here -->
+                        </div>
+                    </div>
+
+                    <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:1rem;">
+                        <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Agregar Actividad</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
 
     document.body.appendChild(modal);
 
     // Close handlers
-    modal.querySelector('.modal-close').onclick = () => modal.remove();
-    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    const close = () => modal.remove();
+    modal.querySelector('.modal-close').onclick = close;
+    modal.querySelector('.btn-cancel').onclick = close;
 
-    // Render activities
-    renderActivityList(activityType);
+    // Setup Logic
+    setupLinkedActivityForm(activityType, close);
 }
 
-function renderActivityList(activityType) {
-    const listDiv = document.getElementById('activitySelector-list');
-    if (!listDiv) return;
+function setupLinkedActivityForm(activityType, closeCallback) {
+    const fFaculty = document.getElementById('linkFaculty');
+    const fProgram = document.getElementById('linkProgram');
+    const fPlan = document.getElementById('linkPlan');
+    const fFactor = document.getElementById('linkFactor');
+    const fActivity = document.getElementById('linkActivity');
 
-    const activities = (store.planActivities || []).filter(a => a.type === activityType);
+    // 1. Populate Faculty
+    fFaculty.innerHTML = '<option value="">-- Seleccionar --</option>' +
+        store.faculties.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
 
-    if (!activities.length) {
-        listDiv.innerHTML = `<p style="text-align:center;padding:2rem;color:#6b7280;">No hay actividades de tipo "${activityType}" registradas. Ve a Configuración > Actividades para crear una.</p>`;
-        return;
+    // 2. Faculty Change -> Populate Program
+    fFaculty.addEventListener('change', () => {
+        fProgram.innerHTML = '<option value="">-- Seleccionar --</option>';
+        fPlan.innerHTML = '<option value="">-- Seleccionar --</option>';
+        fFactor.innerHTML = '<option value="">-- Seleccionar --</option>';
+        fActivity.innerHTML = '<option value="">-- Seleccionar --</option>';
+
+        fProgram.disabled = true;
+        fPlan.disabled = true;
+        fFactor.disabled = true;
+        fActivity.disabled = true;
+
+        if (fFaculty.value) {
+            const programs = store.programs.filter(p => p.facultyId === fFaculty.value);
+            fProgram.innerHTML += programs.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            fProgram.disabled = false;
+        }
+    });
+
+    // 3. Program Change -> Populate Plans
+    fProgram.addEventListener('change', () => {
+        fPlan.innerHTML = '<option value="">-- Seleccionar --</option>';
+        fPlan.disabled = true;
+
+        if (fProgram.value) {
+            const plans = (store.improvementPlans || []).filter(p => p.programId === fProgram.value);
+            fPlan.innerHTML += plans.map(p => `<option value="${p.id}">${p.name} (${p.year || 'N/A'})</option>`).join('');
+            fPlan.disabled = false;
+        }
+    });
+
+    // 4. Plan Change -> Populate Factors
+    fPlan.addEventListener('change', () => {
+        fFactor.innerHTML = '<option value="">-- Seleccionar --</option>';
+        fFactor.disabled = true;
+
+        if (fPlan.value) {
+            const factors = (store.improvementFactors || []).filter(f => f.planId === fPlan.value); // Note: planId in factors refers to the Plan ID
+            fFactor.innerHTML += factors.map(f => `<option value="${f.id}">${f.number}. ${f.name}</option>`).join('');
+            fFactor.disabled = false;
+        }
+    });
+
+    // 5. Factor Change -> Populate Activities
+    fFactor.addEventListener('change', () => {
+        fActivity.innerHTML = '<option value="">-- Seleccionar --</option>';
+        fActivity.disabled = true;
+
+        if (fFactor.value) {
+            // Note: In improvementActivities, 'planId' actually refers to the Factor ID (legacy naming issue mentioned before)
+            const activities = (store.improvementActivities || []).filter(a => a.planId === fFactor.value);
+            fActivity.innerHTML += activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+            fActivity.disabled = false;
+        }
+    });
+
+    // Populate Checkboxes
+    const deliveryContainer = document.getElementById('linkDeliveryContainer');
+    const verificationContainer = document.getElementById('linkVerificationContainer');
+
+    if (store.deliveryForms) {
+        deliveryContainer.innerHTML = store.deliveryForms.map(d => `
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                <input type="checkbox" name="deliveryOption" value="${d.name}"> ${d.name}
+            </label>
+        `).join('');
     }
 
-    listDiv.innerHTML = activities.map(act => `
-                    <div class="activity-item" style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s;" data-id="${act.id}">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div>
-                                <strong>${act.name}</strong>
-                                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
-                                    ${act.description || 'Sin descripción'}
-                                </div>
-                            </div>
-                            <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.75rem;">Agregar</button>
-                        </div>
-                    </div>
-                    `).join('');
+    if (store.verificationMeans) {
+        verificationContainer.innerHTML = store.verificationMeans.map(v => `
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                <input type="checkbox" name="verificationOption" value="${v.name}"> ${v.name}
+            </label>
+        `).join('');
+    }
 
-    // Add click handlers
-    listDiv.querySelectorAll('.activity-item').forEach(item => {
-        item.onclick = () => {
-            const activityId = item.dataset.id;
-            addActivityToPlan(activityId, activityType);
-            document.querySelector('.modal-overlay').remove();
+    // Submit
+    document.getElementById('linkedActivityForm').onsubmit = (e) => {
+        e.preventDefault();
+
+        // Collect Checkbox Values
+        const deliverySelected = Array.from(document.querySelectorAll('input[name="deliveryOption"]:checked')).map(cb => cb.value).join(', ');
+        const verificationSelected = Array.from(document.querySelectorAll('input[name="verificationOption"]:checked')).map(cb => cb.value).join(', ');
+
+        const data = {
+            type: activityType,
+            facultyId: fFaculty.value,
+            programId: fProgram.value,
+            planId: fPlan.value,
+            factorId: fFactor.value,
+            activityId: fActivity.value,
+            activityName: fActivity.options[fActivity.selectedIndex].text,
+            actions: document.getElementById('linkActions').value,
+            hours: parseInt(document.getElementById('linkHours').value),
+            delivery: deliverySelected,
+            verification: verificationSelected
         };
-    });
+
+        addLinkedActivityToPlan(data);
+        closeCallback();
+    };
 }
 
-function addActivityToPlan(activityId, activityType) {
-    const activity = store.planActivities.find(a => a.id === activityId);
-    if (!activity) return;
-
-    // Determine which list to add to based on activity type
+function addLinkedActivityToPlan(data) {
+    // Determine list
     let listId;
-    switch (activityType) {
+    switch (data.type) {
         case 'Apoyo Docencia': listId = 'apoyoList'; break;
         case 'Investigación': listId = 'investigacionList'; break;
         case 'PDI': listId = 'pdiList'; break;
@@ -927,31 +1074,31 @@ function addActivityToPlan(activityId, activityType) {
     item.className = 'plan-item';
     item.style.cssText = 'padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:0.75rem;';
 
-    // Store data for scraping
-    item.dataset.itemData = JSON.stringify({
-        id: activity.id,
-        name: activity.name,
-        description: activity.description,
-        hours: 2, // Default hours, should be dynamic
-        type: activityType
-    });
+    item.dataset.itemData = JSON.stringify(data);
 
     item.innerHTML = `
-                    <div style="display:flex;justify-content:space-between;align-items:start;">
-                        <div>
-                            <strong>${activity.name}</strong>
-                            <div style="font-size:0.875rem;color:#6b7280;margin-top:0.25rem;">
-                                ${activity.description || 'Sin descripción'}
-                            </div>
-                        </div>
-                        <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    `;
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+                    <strong style="color:#1e40af;">${data.activityName}</strong>
+                    <span class="badge badge-info" style="font-size:0.7rem;">${data.hours}h/sem</span>
+                </div>
+                <div style="font-size:0.9rem;color:#334155;margin-bottom:0.5rem;">
+                    <strong>Acción:</strong> ${data.actions}
+                </div>
+                <div style="font-size:0.8rem;color:#64748b;display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                    <div><i class="fas fa-check-circle"></i> Verif: ${data.verification || 'N/A'}</div>
+                    <div><i class="fas fa-file-alt"></i> Entrega: ${data.delivery || 'N/A'}</div>
+                </div>
+            </div>
+            <button class="btn btn-danger btn-sm" style="margin-left:1rem;" onclick="this.parentElement.parentElement.remove();updateHoursSummary();">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
 
     targetList.appendChild(item);
-    showNotification(`Actividad "${activity.name}" agregada`);
+    showNotification('Actividad agregada');
     updateHoursSummary();
 }
 

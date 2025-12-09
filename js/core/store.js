@@ -11,10 +11,7 @@ export const store = {
         ],
         sites: []
     },
-    professors: [
-        { id: 'P-001', name: 'Dra. Ana Ruiz', email: 'ana@uni.edu', photo: null, specialty: 'Educación/TIC', cv: 'PhD en Pedagogía.', profile: 'Investigadora senior.', role: 'profesor' },
-        { id: 'P-002', name: 'Ing. Carlos Pérez', email: 'carlos@uni.edu', photo: null, specialty: '.NET/Agile', cv: 'MSc. en Ing. de Software.', profile: 'Líder innovación.', role: 'coordinador' }
-    ],
+    professors: [],
     groups: [
         { id: 'G-001', name: '2025-1', date: '2025-02-01', description: 'Cohorte 2025-1', features: 'Investigación aplicada', advisorId: 'P-001' },
         { id: 'G-002', name: '2025-2', date: '2025-08-01', description: 'Cohorte 2025-2', features: 'Plan piloto', advisorId: 'P-002' }
@@ -44,6 +41,18 @@ export const store = {
         { id: 'ACT-001', type: 'Apoyo Docencia', name: 'Coordinación de Prácticas', description: 'Coordinación y seguimiento de prácticas pedagógicas' },
         { id: 'ACT-002', type: 'Investigación', name: 'Proyecto Recreación Comunitaria', description: 'Investigación sobre impacto social de la recreación' },
         { id: 'ACT-003', type: 'Gestión', name: 'Comité Curricular', description: 'Participación en comité curricular del programa' }
+    ],
+    deliveryForms: [
+        { id: 'DEL-001', name: 'Informe Escrito' },
+        { id: 'DEL-002', name: 'Acta de Reunión' },
+        { id: 'DEL-003', name: 'Artículo Publicado' },
+        { id: 'DEL-004', name: 'Software/Prototipo' }
+    ],
+    verificationMeans: [
+        { id: 'VER-001', name: 'Certificado' },
+        { id: 'VER-002', name: 'Listado de Asistencia' },
+        { id: 'VER-003', name: 'Enlace Web' },
+        { id: 'VER-004', name: 'Documento PDF' }
     ],
     // Plan de Trabajo Docente
     workPlans: [

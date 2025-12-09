@@ -4,7 +4,7 @@ import { initModals } from './components/Modal.js';
 import { loadDashboard } from './modules/dashboard/dashboard.controller.js';
 import { loadDocencia } from './modules/docencia/docencia.controller.js';
 import { loadPracticas } from './modules/practicas/practicas.controller.js';
-import { loadUsuarios } from './modules/usuarios/usuarios.controller.js';
+import { loadUsuarios } from './modules/usuarios/usuarios.controller.js'; // Updated
 import { loadDocumentos } from './modules/documentos/documentos.controller.js';
 import { loadGrupos } from './modules/grupos/grupos.controller.js';
 import { loadPlanTrabajo } from './modules/plan-trabajo/plan-trabajo.controller.js';
@@ -35,6 +35,7 @@ window.showSection = (section) => {
 
 window.showDataSection = (sectionType) => {
     store.currentSection = sectionType;
+    localStorage.setItem('currentSection', sectionType); // Persist section
     store.currentPage = 1;
 
     // Update Sidebar

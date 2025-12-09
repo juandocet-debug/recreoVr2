@@ -19,6 +19,8 @@ export function loadUtilidades() {
         <button class="utility-tab-btn ${currentUtilityType === 'programs' ? 'active' : ''}" data-type="programs">Programas</button>
         <button class="utility-tab-btn ${currentUtilityType === 'subjects' ? 'active' : ''}" data-type="subjects">Asignaturas</button>
         <button class="utility-tab-btn ${currentUtilityType === 'activities' ? 'active' : ''}" data-type="activities">Actividades</button>
+        <button class="utility-tab-btn ${currentUtilityType === 'delivery' ? 'active' : ''}" data-type="delivery">Formas de Entrega</button>
+        <button class="utility-tab-btn ${currentUtilityType === 'verification' ? 'active' : ''}" data-type="verification">Medios de Verificación</button>
     `;
     dataSection.querySelector('.section-header').after(utilityTabs);
 
@@ -32,7 +34,9 @@ export function loadUtilidades() {
     if (currentUtilityType === 'faculties') loadFaculties(btn, btnText);
     else if (currentUtilityType === 'programs') loadPrograms(btn, btnText);
     else if (currentUtilityType === 'subjects') loadSubjects(btn, btnText);
-    else loadActivities(btn, btnText);
+    else if (currentUtilityType === 'activities') loadActivities(btn, btnText);
+    else if (currentUtilityType === 'delivery') loadDeliveryForms(btn, btnText);
+    else loadVerificationMeans(btn, btnText);
 }
 
 /* -------------------------------------------------------------------------- */

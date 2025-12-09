@@ -171,7 +171,7 @@ function injectPremiumForm() {
     
     <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.5rem;border-top:1px solid #e2e8f0;padding-top:1rem">
       <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+      <button type="button" id="btnSaveProfessor" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
     </div>
   `;
 
@@ -180,6 +180,12 @@ function injectPremiumForm() {
   document.getElementById('profPhotoInput').onchange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > 102400) { // 100KB limit
+        alert('La imagen es demasiado pesada. El tamaño máximo permitido es 100KB.');
+        e.target.value = ''; // Clear input
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (ev) => {
         document.getElementById('profPhotoPreview').src = ev.target.result;
@@ -190,10 +196,14 @@ function injectPremiumForm() {
     }
   };
 
-  profForm.onsubmit = (e) => {
-    e.preventDefault();
+  // Use onclick instead of onsubmit to prevent ANY chance of page reload
+  document.getElementById('btnSaveProfessor').onclick = (e) => {
+    e.preventDefault(); // Just in case
     saveProfessor();
   };
+
+  // Remove onsubmit just to be safe
+  profForm.onsubmit = (e) => { e.preventDefault(); return false; };
 
   profForm.querySelector('.btn-cancel').onclick = () => {
     window.showDataSection('roles-permisos');
@@ -239,7 +249,16 @@ function loadProfessorData(id) {
   }
 }
 
-function saveProfessor() {
+async function saveProfessor() {
+  // Show loading alert with a minimum display time promise
+  const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500)); // 1.5s minimum delay
+  window.showCustomAlert('Procesando...', 'Por favor espere mientras guardamos los cambios.', 'loading');
+
+  const btn = document.getElementById('btnSaveProfessor');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
   const preview = document.getElementById('profPhotoPreview');
   const photoData = preview.style.display !== 'none' ? preview.src : null;
 
@@ -248,44 +267,140 @@ function saveProfessor() {
   const lastName2 = document.getElementById('profLastName2').value;
 
   const professorData = {
-    id: currentProfessorId || Date.now(),
-    firstName,
-    lastName1,
-    lastName2,
+    id: currentProfessorId || 'P-' + Date.now(),
     name: `${firstName} ${lastName1} ${lastName2}`.trim(),
-    identification: document.getElementById('profIdNum').value,
-    phone: document.getElementById('profPhone').value,
     email: document.getElementById('profEmail').value,
-    gender: document.getElementById('profGender').value,
-    sex: document.getElementById('profSex').value,
+    photo: photoData,
     specialty: document.getElementById('profSpecialty').value,
     cv: document.getElementById('profCv').value,
     profile: document.getElementById('profProfile').value,
     role: document.getElementById('profRole').value,
-    photo: photoData
+    identification: document.getElementById('profIdNum').value,
+    phone: document.getElementById('profPhone').value,
+    gender: document.getElementById('profGender').value,
+    sex: document.getElementById('profSex').value
   };
 
-  const idx = store.professors.findIndex(p => p.id === professorData.id);
-  if (idx !== -1) {
-    store.professors[idx] = professorData;
-    showNotification('Profesor actualizado');
-  } else {
-    store.professors.push(professorData);
-    showNotification('Profesor creado');
-  }
+  try {
+    const url = currentProfessorId
+      ? `http://localhost:3000/api/professors/${currentProfessorId}`
+      : 'http://localhost:3000/api/professors';
 
-  window.showDataSection('roles-permisos');
-}
+    const method = currentProfessorId ? 'PUT' : 'POST';
 
-function deleteProf(id) {
-  if (confirm('¿Eliminar profesor?')) {
-    store.professors = store.professors.filter(p => p.id !== id);
-    loadUsuarios();
-    showNotification('Profesor eliminado');
+    const response = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(professorData)
+    });
+
+    // Wait for the minimum delay
+    await loadingPromise;
+
+    if (response.ok) {
+      await window.showCustomAlert('¡Guardado!', 'Profesor guardado exitosamente', 'success');
+
+      // Reload data manually
+      try {
+        const res = await fetch('http://localhost:3000/api/professors');
+        if (res.ok) {
+          const json = await res.json();
+          store.professors = json.data;
+          // loadUsuarios(); // Removed redundant call
+
+          // Correctly navigate back to the professors list using the main app logic
+          if (window.showDataSection) {
+            window.showDataSection('roles-permisos');
+          } else {
+            // Fallback if function not found
+            loadUsuarios(); // Only call here if showDataSection is missing
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('dataSection').style.display = 'block';
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('sectionTitle').textContent = 'Gestión de Profesores';
+          }
+        }
+      } catch (err) {
+        console.error("Error reloading data:", err);
+      }
+    } else {
+      const err = await response.json();
+      window.showCustomAlert('Error', 'Error al guardar: ' + (err.error || err.message), 'error');
+    }
+  } catch (e) {
+    console.error(e);
+    window.showCustomAlert('Error', 'Error de conexión con el servidor', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+    // Only close if it's still the loading alert (success/error alerts handle their own closing via user interaction)
+    // Actually, showCustomAlert replaces the content, so we don't need to explicitly close unless we want to clear it.
+    // But since we awaited the success alert above, it's already closed by the user.
+    // If it was an error, the user clicked OK.
+    // So we don't need window.closeCustomAlert() here, it might close a subsequent alert if we are not careful.
+    // However, for safety, if we are just finishing the loading state without a result alert (unlikely path), we might need it.
+    // But in this flow, we always showed a result alert.
+    // The previous code had window.closeCustomAlert() in finally, which might have been closing the SUCCESS alert immediately if it wasn't awaited properly?
+    // No, I awaited it. But let's remove the forced close in finally to be safe.
   }
 }
 
 window.openProfModal = openProfModal;
+
+async function deleteProf(id) {
+  const result = await window.showCustomAlert(
+    '¿Estás seguro?',
+    "No podrás revertir esta acción",
+    'warning',
+    true // showCancel
+  );
+
+  if (result) {
+    try {
+      // Show loading with delay
+      const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500));
+      window.showCustomAlert('Eliminando...', 'Por favor espere.', 'loading');
+
+      const response = await fetch(`http://localhost:3000/api/professors/${id}`, {
+        method: 'DELETE'
+      });
+
+      await loadingPromise;
+
+      if (response.ok) {
+        await window.showCustomAlert('¡Eliminado!', 'El profesor ha sido eliminado.', 'success');
+
+        // Reload data manually
+        try {
+          const res = await fetch('http://localhost:3000/api/professors');
+          if (res.ok) {
+            const json = await res.json();
+            store.professors = json.data;
+            // loadUsuarios(); // Removed redundant call
+
+            // Ensure we stay on list using the main app logic
+            if (window.showDataSection) {
+              window.showDataSection('roles-permisos');
+            } else {
+              loadUsuarios();
+              document.getElementById('dashboard').style.display = 'none';
+              document.getElementById('dataSection').style.display = 'block';
+              document.getElementById('formSection').style.display = 'none';
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        window.showCustomAlert('Error', 'Error al eliminar', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      window.showCustomAlert('Error', 'Error de conexión', 'error');
+    }
+  }
+}
+
 window.deleteProf = deleteProf;
 
 export function loadUsuarios() {

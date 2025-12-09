@@ -1,0 +1,93 @@
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const dbPath = path.resolve(__dirname, 'recreo.db');
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Error opening database ' + dbPath + ': ' + err.message);
+    } else {
+        console.log('Connected to the SQLite database.');
+        initDb();
+    }
+});
+
+function initDb() {
+    db.serialize(() => {
+        // Users Table
+        db.run(`CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT,
+            name TEXT
+        )`, (err) => {
+            if (err) {
+                console.error("Error creating table users:", err);
+            } else {
+                // Seed initial users if empty
+                db.get("SELECT count(*) as count FROM users", (err, row) => {
+                    if (row.count === 0) {
+                        console.log("Seeding initial users...");
+                        const stmt = db.prepare("INSERT INTO users (username, password, role, name) VALUES (?, ?, ?, ?)");
+                        stmt.run("admin", "admin123", "administrador", "Administrador");
+                        stmt.run("coord", "coord123", "coordinador", "Coordinador");
+                        stmt.run("prof", "prof123", "profesor", "Profesor");
+                        stmt.run("est", "est123", "estudiante", "Estudiante");
+                        stmt.finalize();
+                    }
+                });
+            }
+        });
+
+        // Professors Table
+        db.run(`CREATE TABLE IF NOT EXISTS professors (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            photo TEXT,
+            specialty TEXT,
+            cv TEXT,
+            profile TEXT,
+            role TEXT,
+            identification TEXT,
+            phone TEXT,
+            gender TEXT,
+            sex TEXT
+        )`, (err) => {
+            if (err) {
+                console.error("Error creating table professors:", err);
+            } else {
+                // Attempt to add new columns if they don't exist (Schema Migration)
+                const columnsToAdd = [
+                    "ALTER TABLE professors ADD COLUMN identification TEXT",
+                    "ALTER TABLE professors ADD COLUMN phone TEXT",
+                    "ALTER TABLE professors ADD COLUMN gender TEXT",
+                    "ALTER TABLE professors ADD COLUMN sex TEXT"
+                ];
+
+                columnsToAdd.forEach(sql => {
+                    db.run(sql, (err) => {
+                        // Ignore error if column already exists
+                        if (err && !err.message.includes("duplicate column")) {
+                            // console.error("Migration note:", err.message); 
+                        }
+                    });
+                });
+
+                // Seed initial professors
+                db.get("SELECT count(*) as count FROM professors", (err, row) => {
+                    if (row.count === 0) {
+                        console.log("Seeding initial professors...");
+                        const stmt = db.prepare("INSERT INTO professors (id, name, email, photo, specialty, cv, profile, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        stmt.run('P-001', 'Dra. Ana Ruiz', 'ana@uni.edu', null, 'Educación/TIC', 'PhD en Pedagogía.', 'Investigadora senior.', 'profesor');
+                        stmt.run('P-002', 'Ing. Carlos Pérez', 'carlos@uni.edu', null, '.NET/Agile', 'MSc. en Ing. de Software.', 'Líder innovación.', 'coordinador');
+                        stmt.finalize();
+                    }
+                });
+            }
+        });
+    });
+}
+
+module.exports = db;
