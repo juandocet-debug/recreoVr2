@@ -20,20 +20,37 @@ function initDb() {
             username TEXT UNIQUE,
             password TEXT,
             role TEXT,
-            name TEXT
+            name TEXT,
+            mustChangePassword INTEGER DEFAULT 1,
+            relatedId TEXT
         )`, (err) => {
             if (err) {
                 console.error("Error creating table users:", err);
             } else {
+                // Schema Migration for Users
+                const columnsToAdd = [
+                    "ALTER TABLE users ADD COLUMN mustChangePassword INTEGER DEFAULT 1",
+                    "ALTER TABLE users ADD COLUMN relatedId TEXT"
+                ];
+
+                columnsToAdd.forEach(sql => {
+                    db.run(sql, (err) => {
+                        if (err && !err.message.includes("duplicate column")) {
+                            // console.error("Migration note:", err.message);
+                        }
+                    });
+                });
+
                 // Seed initial users if empty
                 db.get("SELECT count(*) as count FROM users", (err, row) => {
                     if (row.count === 0) {
                         console.log("Seeding initial users...");
-                        const stmt = db.prepare("INSERT INTO users (username, password, role, name) VALUES (?, ?, ?, ?)");
-                        stmt.run("admin", "admin123", "administrador", "Administrador");
-                        stmt.run("coord", "coord123", "coordinador", "Coordinador");
-                        stmt.run("prof", "prof123", "profesor", "Profesor");
-                        stmt.run("est", "est123", "estudiante", "Estudiante");
+                        const stmt = db.prepare("INSERT INTO users (username, password, role, name, mustChangePassword) VALUES (?, ?, ?, ?, ?)");
+                        // Admin doesn't need to change password initially for dev convenience, or maybe yes? Let's set to 0 for admin default
+                        stmt.run("admin", "admin123", "administrador", "Administrador", 0);
+                        stmt.run("coord", "coord123", "coordinador", "Coordinador", 1);
+                        stmt.run("prof", "prof123", "profesor", "Profesor", 1);
+                        stmt.run("est", "est123", "estudiante", "Estudiante", 1);
                         stmt.finalize();
                     }
                 });
@@ -63,7 +80,8 @@ function initDb() {
                     "ALTER TABLE professors ADD COLUMN identification TEXT",
                     "ALTER TABLE professors ADD COLUMN phone TEXT",
                     "ALTER TABLE professors ADD COLUMN gender TEXT",
-                    "ALTER TABLE professors ADD COLUMN sex TEXT"
+                    "ALTER TABLE professors ADD COLUMN sex TEXT",
+                    "ALTER TABLE professors ADD COLUMN signatureImage TEXT"
                 ];
 
                 columnsToAdd.forEach(sql => {

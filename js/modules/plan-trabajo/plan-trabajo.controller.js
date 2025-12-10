@@ -70,6 +70,11 @@ function renderPlanTable() {
 
     let plans = store.workPlans || [];
 
+    // RBAC Filtering: Professors only see their own plans
+    if (store.currentUser && store.currentUser.role === 'profesor' && store.currentUser.relatedId) {
+        plans = plans.filter(p => p.professorId === store.currentUser.relatedId);
+    }
+
     // Filtering
     if (filterYear) plans = plans.filter(p => p.year.toString() === filterYear);
     if (filterPeriod) plans = plans.filter(p => p.period.toLowerCase().includes(filterPeriod));

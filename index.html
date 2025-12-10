@@ -367,6 +367,28 @@
     </div>
   </div>
 
+  <!-- Change Password Modal -->
+  <div id="changePasswordModal" class="modal" style="display:none; z-index: 100000;">
+    <div class="modal-content" style="max-width: 400px; padding: 2rem;">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <i class="fas fa-key" style="font-size: 3rem; color: #4299e1;"></i>
+        <h3 style="margin-top: 1rem; color: #2d3748;">Cambio de Contraseña Obligatorio</h3>
+        <p style="color: #718096;">Por seguridad, debes cambiar tu contraseña inicial.</p>
+      </div>
+      <form id="changePasswordForm">
+        <div class="form-group">
+          <label for="newPassword">Nueva Contraseña</label>
+          <input type="password" id="newPassword" class="form-control" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">Confirmar Contraseña</label>
+          <input type="password" id="confirmPassword" class="form-control" required minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Cambiar Contraseña</button>
+      </form>
+    </div>
+  </div>
+
   <script>
     // Simple Custom Alert Logic
     window.showCustomAlert = function (title, message, icon = 'info', showCancel = false) {
@@ -416,7 +438,7 @@
     };
   </script>
 
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=2"></script>
 </body>
 
 </html>

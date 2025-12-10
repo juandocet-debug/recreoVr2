@@ -4,7 +4,7 @@ import { initModals } from './components/Modal.js';
 import { loadDashboard } from './modules/dashboard/dashboard.controller.js';
 import { loadDocencia } from './modules/docencia/docencia.controller.js';
 import { loadPracticas } from './modules/practicas/practicas.controller.js';
-import { loadUsuarios } from './modules/usuarios/usuarios.controller.js'; // Updated
+import { loadUsuarios } from './modules/usuarios/usuarios.controller.js';
 import { loadDocumentos } from './modules/documentos/documentos.controller.js';
 import { loadGrupos } from './modules/grupos/grupos.controller.js';
 import { loadPlanTrabajo } from './modules/plan-trabajo/plan-trabajo.controller.js';
@@ -34,6 +34,11 @@ window.showSection = (section) => {
 };
 
 window.showDataSection = (sectionType) => {
+    if (!checkPermission(sectionType)) {
+        window.showCustomAlert('Acceso Denegado', 'No tienes permisos para acceder a esta sección.', 'error');
+        return;
+    }
+
     store.currentSection = sectionType;
     localStorage.setItem('currentSection', sectionType); // Persist section
     store.currentPage = 1;
@@ -144,7 +149,6 @@ window.showForm = (title) => {
     // Setup Cancel Button
     const cancelBtns = document.querySelectorAll('.btn-cancel');
     cancelBtns.forEach(btn => {
-        // Remove old listeners to be safe (cloning node is a trick, but simple reassignment works if we don't need multiple listeners)
         btn.onclick = () => {
             window.showDataSection(store.currentSection);
         };
@@ -166,4 +170,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Global Error Handler
     window.addEventListener('error', e => console.error(e));
+
+    // Listen for login to update sidebar
+    window.addEventListener('auth:login', (e) => {
+        updateSidebar(e.detail.role);
+    });
 });
+
+function updateSidebar(role) {
+    const navItems = document.querySelectorAll('.sidebar-nav > .nav-item, .sidebar-nav > .submenu > .nav-item');
+
+    // Strategy:
+    // 1. Define allowed sections per role.
+    // 2. Iterate all items with onclick="showDataSection(...)".
+    // 3. If allowed, show. Else hide.
+    // 4. Iterate all parent items (submenu triggers). If all children hidden, hide parent.
+
+    const allowed = {
+        'administrador': ['*'],
+        'coordinador': ['*'],
+        'profesor': ['acta', 'plan-trabajo'],
+        'estudiante': ['acta']
+    };
+
+    const userAllowed = allowed[role] || [];
+    const isAll = userAllowed.includes('*');
+
+    // 1. Filter Leaf Items
+    document.querySelectorAll('.sidebar-nav .submenu .nav-item, .sidebar-nav > .nav-item[onclick]').forEach(item => {
+        const onclick = item.getAttribute('onclick');
+        if (!onclick) return;
+
+        // Extract section name: showDataSection('acta') -> acta
+        const match = onclick.match(/'([^']+)'/);
+        if (match) {
+            const section = match[1];
+            if (section === 'dashboard') return; // Always show dashboard? Or maybe not?
+
+            if (isAll || userAllowed.includes(section)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        }
+    });
+
+    // 2. Filter Parents (Submenu headers)
+    document.querySelectorAll('.sidebar-nav > .nav-item').forEach(parent => {
+        if (parent.nextElementSibling && parent.nextElementSibling.classList.contains('submenu')) {
+            const submenu = parent.nextElementSibling;
+            const visibleChildren = Array.from(submenu.children).filter(c => c.style.display !== 'none');
+
+            if (visibleChildren.length > 0) {
+                parent.style.display = 'flex';
+            } else {
+                parent.style.display = 'none';
+            }
+        }
+    });
+
+    // 3. Dashboard Cards
+    document.querySelectorAll('.dashboard-card').forEach(card => {
+        const links = card.querySelectorAll('a');
+        let hasVisibleLinks = false;
+        links.forEach(link => {
+            const onclick = link.getAttribute('onclick');
+            if (onclick) {
+                const match = onclick.match(/'([^']+)'/);
+                if (match) {
+                    const section = match[1];
+                    if (isAll || userAllowed.includes(section)) {
+                        hasVisibleLinks = true;
+                        link.parentElement.style.display = 'block'; // Show LI
+                    } else {
+                        link.parentElement.style.display = 'none'; // Hide LI
+                    }
+                }
+            }
+        });
+
+        if (hasVisibleLinks) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function checkPermission(section) {
+    if (!store.currentUser) return false;
+    const role = store.currentUser.role;
+
+    const allowed = {
+        'administrador': ['*'],
+        'coordinador': ['*'],
+        'profesor': ['acta', 'plan-trabajo'],
+        'estudiante': ['acta']
+    };
+
+    const userAllowed = allowed[role] || [];
+    if (userAllowed.includes('*')) return true;
+    return userAllowed.includes(section);
+}

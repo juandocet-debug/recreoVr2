@@ -4,7 +4,7 @@ const cors = require('cors');
 const db = require('./db');
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -13,7 +13,6 @@ app.use(bodyParser.json());
 app.post('/api/login', (req, res) => {
     const { username, password, role } = req.body;
 
-    // Simple query - in production use hashing!
     const sql = "SELECT * FROM users WHERE username = ? AND password = ?";
     db.get(sql, [username, password], (err, row) => {
         if (err) {
@@ -21,7 +20,6 @@ app.post('/api/login', (req, res) => {
             return;
         }
         if (row) {
-            // Check role if provided (optional validation)
             if (role && row.role !== role) {
                 res.status(401).json({ "message": "Rol incorrecto para este usuario" });
                 return;
@@ -33,6 +31,19 @@ app.post('/api/login', (req, res) => {
         } else {
             res.status(401).json({ "message": "Credenciales inválidas" });
         }
+    });
+});
+
+// Change Password Endpoint
+app.post('/api/change-password', (req, res) => {
+    const { userId, newPassword } = req.body;
+    const sql = "UPDATE users SET password = ?, mustChangePassword = 0 WHERE id = ?";
+    db.run(sql, [newPassword, userId], function (err) {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({ "message": "success", "changes": this.changes });
     });
 });
 
@@ -53,21 +64,40 @@ app.get('/api/professors', (req, res) => {
     });
 });
 
-// POST Create Professor
+// POST Create Professor (and User)
 app.post('/api/professors', (req, res) => {
     const { id, name, email, photo, specialty, cv, profile, role, identification, phone, gender, sex } = req.body;
-    const sql = "INSERT INTO professors (id, name, email, photo, specialty, cv, profile, role, identification, phone, gender, sex) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
-    const params = [id, name, email, photo, specialty, cv, profile, role, identification, phone, gender, sex];
 
-    db.run(sql, params, function (err) {
+    // 1. Create Professor Record
+    const sqlProf = "INSERT INTO professors (id, name, email, photo, specialty, cv, profile, role, identification, phone, gender, sex) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+    const paramsProf = [id, name, email, photo, specialty, cv, profile, role, identification, phone, gender, sex];
+
+    db.run(sqlProf, paramsProf, function (err) {
         if (err) {
             res.status(400).json({ "error": err.message });
             return;
         }
-        res.json({
-            "message": "success",
-            "data": req.body,
-            "id": this.lastID
+
+        // 2. Create User Record automatically
+        // Default credentials: username = identification, password = identification
+        const username = identification;
+        const password = identification;
+
+        const sqlUser = "INSERT INTO users (username, password, role, name, mustChangePassword, relatedId) VALUES (?, ?, ?, ?, 1, ?)";
+        db.run(sqlUser, [username, password, role, name, id], function (errUser) {
+            if (errUser) {
+                console.error("Error creating user for professor:", errUser);
+            }
+
+            res.json({
+                "message": "success",
+                "data": req.body,
+                "id": this.lastID,
+                "credentials": {
+                    "username": username,
+                    "password": password
+                }
+            });
         });
     });
 });
@@ -115,23 +145,55 @@ app.delete('/api/professors/:id', (req, res) => {
     });
 });
 
+// PUT Update Professor Signature Image
+app.put('/api/professors/:id/signature', (req, res) => {
+    const { signatureImage } = req.body;
+    const sql = "UPDATE professors SET signatureImage = ? WHERE id = ?";
+    db.run(sql, [signatureImage, req.params.id], function (err) {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({ "message": "success", "changes": this.changes });
+    });
+});
+
 // === Actas Endpoints ===
 
-// GET All Actas
+// GET All Actas (with optional filtering by user)
 app.get('/api/actas', (req, res) => {
+    const { userId, userRole } = req.query;
+
     const sql = "SELECT * FROM actas";
     db.all(sql, [], (err, rows) => {
         if (err) {
             res.status(400).json({ "error": err.message });
             return;
         }
+
         // Parse JSON fields
-        const data = rows.map(row => ({
+        let data = rows.map(row => ({
             ...row,
             content: JSON.parse(row.content || '{}'),
             commitments: JSON.parse(row.commitments || '[]'),
             signatures: JSON.parse(row.signatures || '{}')
         }));
+
+        // Filter by user if not admin/coordinator
+        if (userId && userRole && userRole !== 'administrador' && userRole !== 'coordinador') {
+            data = data.filter(acta => {
+                const attendees = acta.content.attendees || [];
+                const absent = acta.content.absent || [];
+                const guests = acta.content.guests || [];
+
+                // Check if user name is in any of the lists
+                const allRelated = [...attendees, ...absent, ...guests];
+                return allRelated.some(person =>
+                    person.name && person.name.toLowerCase().includes(userId.toLowerCase())
+                );
+            });
+        }
+
         res.json({ "message": "success", "data": data });
     });
 });

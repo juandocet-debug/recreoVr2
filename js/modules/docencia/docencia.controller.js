@@ -23,7 +23,19 @@ export async function loadDocencia() {
 
 async function fetchActas() {
     try {
-        const res = await fetch('http://localhost:3000/api/actas');
+        // Build URL with optional user filtering
+        let url = 'http://localhost:3001/api/actas';
+
+        // If user is logged in, pass their info for filtering
+        if (store.currentUser) {
+            const params = new URLSearchParams({
+                userId: store.currentUser.name || store.currentUser.username,
+                userRole: store.currentUser.role
+            });
+            url += `?${params.toString()}`;
+        }
+
+        const res = await fetch(url);
         if (res.ok) {
             const json = await res.json();
             store.allData = store.allData || {};
@@ -42,7 +54,7 @@ export async function openActaModal(actaId = null) {
     if (!store.professors || store.professors.length === 0) {
         window.showCustomAlert('Cargando datos...', 'Obteniendo lista de usuarios', 'loading');
         try {
-            const res = await fetch('http://localhost:3000/api/professors');
+            const res = await fetch('http://localhost:3001/api/professors');
             if (res.ok) {
                 const json = await res.json();
                 store.professors = json.data;
@@ -408,7 +420,7 @@ async function saveActa() {
     };
 
     try {
-        const url = currentActaId ? `http://localhost:3000/api/actas/${currentActaId}` : 'http://localhost:3000/api/actas';
+        const url = currentActaId ? `http://localhost:3001/api/actas/${currentActaId}` : 'http://localhost:3001/api/actas';
         const method = currentActaId ? 'PUT' : 'POST';
         const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (res.ok) {
@@ -445,7 +457,25 @@ function renderActaTable() {
     data.forEach(item => {
         const tr = document.createElement('tr');
         const attendeeCount = item.content.attendees ? item.content.attendees.length : 0;
-        const isSigned = item.signatures && Object.keys(item.signatures).length > 0;
+        const signatureCount = item.signatures ? Object.keys(item.signatures).length : 0;
+        const totalCanSign = attendeeCount + (item.content.guests ? item.content.guests.length : 0);
+
+        // Check if current user can sign
+        const userName = store.currentUser.name || store.currentUser.username;
+        const attendees = item.content.attendees || [];
+        const guests = item.content.guests || [];
+        const allCanSign = [...attendees, ...guests];
+        const userCanSign = allCanSign.some(p => p.name && p.name.toLowerCase().includes(userName.toLowerCase()))
+            || store.currentUser.role === 'administrador'
+            || store.currentUser.role === 'coordinador';
+        const hasSigned = item.signatures && item.signatures[store.currentUser.username];
+
+        let signBtn = '';
+        if (userCanSign && !hasSigned) {
+            signBtn = `<button class="btn btn-sm btn-success" onclick="signActa(${item.id})" title="Firmar"><i class="fas fa-signature"></i></button>`;
+        } else if (hasSigned) {
+            signBtn = `<button class="btn btn-sm btn-outline-success" disabled title="Ya firmado"><i class="fas fa-check"></i></button>`;
+        }
 
         tr.innerHTML = `
             <td>${item.date}</td>
@@ -455,9 +485,15 @@ function renderActaTable() {
             </td>
             <td>${item.location}</td>
             <td>${attendeeCount} personas</td>
-            <td>${isSigned ? '<span class="badge bg-success">Firmada</span>' : '<span class="badge bg-warning text-dark">Pendiente</span>'}</td>
+            <td>
+                ${signatureCount > 0
+                ? `<span class="badge bg-success">${signatureCount}/${totalCanSign} Firmas</span>`
+                : '<span class="badge bg-warning text-dark">Sin firmas</span>'
+            }
+            </td>
             <td>
                 <button class="btn btn-sm btn-primary" onclick="viewActa(${item.id})" title="Ver Detalles"><i class="fas fa-eye"></i></button>
+                ${signBtn}
                 <button class="btn btn-sm btn-secondary" onclick="downloadActa(${item.id})" title="Descargar PDF"><i class="fas fa-file-download"></i></button>
                 <button class="btn btn-sm btn-danger" onclick="deleteActa(${item.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
             </td>
@@ -474,12 +510,21 @@ function viewActa(id) {
     const acta = store.allData.acta.find(a => a.id === id);
     if (!acta) return;
 
-    const canSign = store.currentUser.role === 'estudiante';
+    // Check if user can sign (is in attendees or guests)
+    const userName = store.currentUser.name || store.currentUser.username;
+    const attendees = acta.content.attendees || [];
+    const guests = acta.content.guests || [];
+    const allCanSign = [...attendees, ...guests];
+
+    const isRelated = allCanSign.some(p =>
+        p.name && p.name.toLowerCase().includes(userName.toLowerCase())
+    ) || store.currentUser.role === 'administrador' || store.currentUser.role === 'coordinador';
+
     const hasSigned = acta.signatures && acta.signatures[store.currentUser.username];
 
     let signBtn = '';
-    if (canSign && !hasSigned) {
-        signBtn = `<button class="btn btn-success mt-3" onclick="signActa(${id})"><i class="fas fa-signature"></i> Firmar Acta Digitalmente</button>`;
+    if (isRelated && !hasSigned) {
+        signBtn = `<button class="btn btn-success mt-3" onclick="signActa(${id}); window.closeCustomAlert();"><i class="fas fa-signature"></i> Firmar Acta</button>`;
     } else if (hasSigned) {
         signBtn = `<div class="alert alert-success mt-3"><i class="fas fa-check-circle"></i> Ya has firmado esta acta</div>`;
     }
@@ -741,12 +786,30 @@ async function downloadActa(id) {
                                         <td style="width: 50%;"><strong>Nombre</strong></td>
                                         <td style="width: 50%;"><strong>Firma</strong></td>
                                     </tr>
-                                    ${Object.entries(acta.signatures || {}).map(([user, date]) => `
-                                        <tr>
-                                            <td style="height: 40px; vertical-align: bottom;">${user}</td>
-                                            <td style="vertical-align: bottom; font-size: 9px;">Firmado digitalmente: ${new Date(date).toLocaleString()}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${Object.entries(acta.signatures || {}).map(([user, sigData]) => {
+        // Handle both old format (just date string) and new format (object with image)
+        const isOldFormat = typeof sigData === 'string';
+        const name = isOldFormat ? user : (sigData.name || user);
+        const date = isOldFormat ? sigData : sigData.date;
+        const signatureImage = isOldFormat ? null : sigData.signatureImage;
+
+        return `
+                                            <tr>
+                                                <td style="height: 60px; vertical-align: middle; padding: 8px;">
+                                                    <div style="font-weight: bold;">${name}</div>
+                                                    <div style="font-size: 9px; color: #666; margin-top: 4px;">
+                                                        Firmado: ${new Date(date).toLocaleString('es-ES')}
+                                                    </div>
+                                                </td>
+                                                <td style="vertical-align: middle; text-align: center; padding: 8px;">
+                                                    ${signatureImage
+                ? `<img src="${signatureImage}" style="max-height: 50px; max-width: 150px; object-fit: contain;" alt="Firma">`
+                : `<span style="font-size: 9px; color: #999;">Firma digital</span>`
+            }
+                                                </td>
+                                            </tr>
+                                        `;
+    }).join('')}
                                     ${Object.keys(acta.signatures || {}).length === 0 ? `<tr><td style="height: 40px;"></td><td></td></tr>` : ''}
                                 </table>
                             </td>
@@ -773,30 +836,170 @@ async function downloadActa(id) {
 }
 
 window.signActa = async (id) => {
-    try {
-        const acta = store.allData.acta.find(a => a.id === id);
-        const signatures = acta.signatures || {};
-        signatures[store.currentUser.username] = new Date().toISOString();
+    const acta = store.allData.acta.find(a => a.id === id);
+    if (!acta) return;
 
-        const res = await fetch(`http://localhost:3000/api/actas/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ signatures })
-        });
+    // Check if user is in attendees or guests
+    const userName = store.currentUser.name || store.currentUser.username;
+    const attendees = acta.content.attendees || [];
+    const guests = acta.content.guests || [];
+    const allCanSign = [...attendees, ...guests];
 
-        if (res.ok) {
-            window.showCustomAlert('Firmado', 'Has firmado el acta correctamente', 'success');
-            loadDocencia();
-        }
-    } catch (e) {
-        console.error(e);
+    const isRelated = allCanSign.some(p =>
+        p.name && p.name.toLowerCase().includes(userName.toLowerCase())
+    );
+
+    if (!isRelated && store.currentUser.role !== 'administrador' && store.currentUser.role !== 'coordinador') {
+        window.showCustomAlert('No autorizado', 'Solo los asistentes o invitados pueden firmar esta acta.', 'error');
+        return;
     }
+
+    // Create signature modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'signatureModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px; border-top: 4px solid #10B981;">
+            <div class="modal-header" style="border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-signature" style="color: #10B981;"></i>
+                    Firmar Acta
+                </h3>
+                <button class="modal-close" onclick="document.getElementById('signatureModal').remove()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem;">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <p style="color: #64748b; margin: 0;">Sube una imagen de tu firma manuscrita para firmar el acta.</p>
+                    <small style="color: #94a3b8;">Tamaño máximo: 100KB • Formatos: PNG, JPG</small>
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="signatureImageInput" style="
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 0.75rem;
+                        padding: 2rem;
+                        border: 2px dashed #cbd5e1;
+                        border-radius: 12px;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                        background: #f8fafc;
+                    " id="signatureUploadArea">
+                        <img id="signaturePreview" style="max-width: 100%; max-height: 120px; display: none; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <div id="signaturePlaceholder" style="text-align: center;">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: #94a3b8;"></i>
+                            <div style="color: #64748b; margin-top: 0.5rem;">Click para seleccionar imagen de firma</div>
+                        </div>
+                    </label>
+                    <input type="file" id="signatureImageInput" accept="image/png, image/jpeg" style="display: none;">
+                </div>
+                
+                <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; color: #166534; font-weight: 500;">
+                        <i class="fas fa-user"></i>
+                        <span>Firmando como: ${store.currentUser.name || store.currentUser.username}</span>
+                    </div>
+                    <div style="color: #15803d; font-size: 0.875rem; margin-top: 0.25rem;">
+                        ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="document.getElementById('signatureModal').remove()">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" style="flex: 1;" id="btnConfirmSignature" disabled>
+                        <i class="fas fa-check"></i> Confirmar Firma
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Handle image upload
+    let signatureImageData = null;
+    const fileInput = document.getElementById('signatureImageInput');
+    const preview = document.getElementById('signaturePreview');
+    const placeholder = document.getElementById('signaturePlaceholder');
+    const confirmBtn = document.getElementById('btnConfirmSignature');
+    const uploadArea = document.getElementById('signatureUploadArea');
+
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 102400) { // 100KB max
+            window.showCustomAlert('Archivo muy grande', 'La imagen debe ser menor a 100KB', 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            signatureImageData = ev.target.result;
+            preview.src = signatureImageData;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+            uploadArea.style.borderColor = '#10B981';
+            uploadArea.style.background = '#f0fdf4';
+            confirmBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Handle confirm signature
+    confirmBtn.onclick = async () => {
+        if (!signatureImageData) {
+            window.showCustomAlert('Falta firma', 'Por favor sube una imagen de tu firma', 'error');
+            return;
+        }
+
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+        try {
+            const signatures = acta.signatures || {};
+            signatures[store.currentUser.username] = {
+                date: new Date().toISOString(),
+                name: store.currentUser.name || store.currentUser.username,
+                signatureImage: signatureImageData
+            };
+
+            const res = await fetch(`http://localhost:3001/api/actas/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ signatures })
+            });
+
+            if (res.ok) {
+                document.getElementById('signatureModal').remove();
+                await window.showCustomAlert('¡Firmado!', 'Acta firmada correctamente', 'success');
+                loadDocencia();
+            } else {
+                throw new Error('Error al guardar');
+            }
+        } catch (e) {
+            console.error(e);
+            window.showCustomAlert('Error', 'No se pudo guardar la firma', 'error');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fas fa-check"></i> Confirmar Firma';
+        }
+    };
+
+    // Close on overlay click
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+    };
 };
 
 async function deleteActa(id) {
     if (await window.showCustomAlert('¿Eliminar?', 'Esta acción no se puede deshacer', 'warning', true)) {
         try {
-            await fetch(`http://localhost:3000/api/actas/${id}`, { method: 'DELETE' });
+            await fetch(`http://localhost:3001/api/actas/${id}`, { method: 'DELETE' });
             loadDocencia();
         } catch (e) {
             console.error(e);

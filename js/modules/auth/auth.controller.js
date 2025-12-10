@@ -31,7 +31,7 @@ async function handleLogin(e) {
         btn.textContent = 'Verificando...';
         btn.disabled = true;
 
-        const response = await fetch('http://localhost:3000/api/login', {
+        const response = await fetch('http://localhost:3001/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: u, password: p, role: r })
@@ -40,10 +40,26 @@ async function handleLogin(e) {
         const data = await response.json();
 
         if (response.ok) {
+            // Check if password change is required
+            if (data.data.mustChangePassword) {
+                // Show Change Password Modal
+                document.getElementById('changePasswordModal').style.display = 'flex';
+
+                // Setup Change Password Form
+                const changePassForm = document.getElementById('changePasswordForm');
+                changePassForm.onsubmit = (ev) => handleChangePassword(ev, data.data.id);
+
+                btn.textContent = originalText;
+                btn.disabled = false;
+                return; // Stop login flow
+            }
+
             store.currentUser = {
+                id: data.data.id, // Store ID for filtering
                 username: data.data.username,
                 role: data.data.role,
-                name: data.data.name
+                name: data.data.name,
+                relatedId: data.data.relatedId
             };
 
             // Persist simple session
@@ -64,6 +80,47 @@ async function handleLogin(e) {
             btn.textContent = 'Ingresar';
             btn.disabled = false;
         }
+    }
+}
+
+async function handleChangePassword(e, userId) {
+    e.preventDefault();
+    const newPass = document.getElementById('newPassword').value;
+    const confirmPass = document.getElementById('confirmPassword').value;
+
+    if (newPass !== confirmPass) {
+        alert('Las contraseñas no coinciden');
+        return;
+    }
+
+    try {
+        const btn = e.target.querySelector('button');
+        const originalText = btn.textContent;
+        btn.textContent = 'Cambiando...';
+        btn.disabled = true;
+
+        const response = await fetch('http://localhost:3001/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userId, newPassword: newPass })
+        });
+
+        if (response.ok) {
+            alert('Contraseña actualizada exitosamente. Por favor, inicia sesión nuevamente.');
+            document.getElementById('changePasswordModal').style.display = 'none';
+            document.getElementById('loginForm').reset();
+            document.getElementById('changePasswordForm').reset();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Error al cambiar la contraseña');
+        }
+
+        btn.textContent = originalText;
+        btn.disabled = false;
+
+    } catch (error) {
+        console.error(error);
+        alert('Error de conexión');
     }
 }
 
@@ -95,7 +152,7 @@ async function showApp() {
 
 export async function fetchProfessors() {
     try {
-        const response = await fetch('http://localhost:3000/api/professors');
+        const response = await fetch('http://localhost:3001/api/professors');
         if (response.ok) {
             const json = await response.json();
             store.professors = json.data;

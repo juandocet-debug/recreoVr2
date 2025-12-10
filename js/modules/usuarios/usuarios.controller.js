@@ -284,8 +284,8 @@ async function saveProfessor() {
 
   try {
     const url = currentProfessorId
-      ? `http://localhost:3000/api/professors/${currentProfessorId}`
-      : 'http://localhost:3000/api/professors';
+      ? `http://localhost:3001/api/professors/${currentProfessorId}`
+      : 'http://localhost:3001/api/professors';
 
     const method = currentProfessorId ? 'PUT' : 'POST';
 
@@ -298,23 +298,38 @@ async function saveProfessor() {
     // Wait for the minimum delay
     await loadingPromise;
 
+    const resJson = await response.json();
+    console.log('Server Response:', resJson); // DEBUG
+    // FORCE DEBUG ALERT
+    window.alert('DEBUG SERVER RESPONSE:\n' + JSON.stringify(resJson, null, 2));
+
     if (response.ok) {
-      await window.showCustomAlert('¡Guardado!', 'Usuario guardado exitosamente', 'success');
+      if (resJson.credentials) {
+        console.log('Credentials found, showing modal...'); // DEBUG
+        const email = professorData.email;
+        const name = professorData.name;
+        const username = resJson.credentials.username;
+        const password = resJson.credentials.password;
+
+        // Show Manual Credentials Modal
+        showCredentialsModal(name, email, username, password);
+      } else {
+        await window.showCustomAlert('¡Guardado!', 'Usuario guardado exitosamente', 'success');
+      }
 
       // Reload data manually
       try {
-        const res = await fetch('http://localhost:3000/api/professors');
+        const res = await fetch('http://localhost:3001/api/professors');
         if (res.ok) {
           const json = await res.json();
           store.professors = json.data;
-          // loadUsuarios(); // Removed redundant call
 
           // Correctly navigate back to the professors list using the main app logic
           if (window.showDataSection) {
             window.showDataSection('roles-permisos');
           } else {
             // Fallback if function not found
-            loadUsuarios(); // Only call here if showDataSection is missing
+            loadUsuarios();
             document.getElementById('dashboard').style.display = 'none';
             document.getElementById('dataSection').style.display = 'block';
             document.getElementById('formSection').style.display = 'none';
@@ -362,7 +377,7 @@ async function deleteProf(id) {
       const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500));
       window.showCustomAlert('Eliminando...', 'Por favor espere.', 'loading');
 
-      const response = await fetch(`http://localhost:3000/api/professors/${id}`, {
+      const response = await fetch(`http://localhost:3001/api/professors/${id}`, {
         method: 'DELETE'
       });
 
@@ -373,7 +388,7 @@ async function deleteProf(id) {
 
         // Reload data manually
         try {
-          const res = await fetch('http://localhost:3000/api/professors');
+          const res = await fetch('http://localhost:3001/api/professors');
           if (res.ok) {
             const json = await res.json();
             store.professors = json.data;
@@ -445,16 +460,25 @@ export function loadUsuarios() {
         { header: 'Identificación', field: 'identification' },
         { header: 'Email', field: 'email' },
         { header: 'Teléfono', field: 'phone' },
-        { header: 'Especialidad', field: 'specialty' },
+        { header: 'Rol', field: 'role' },
         {
           header: 'Perfil',
           field: 'id',
           render: (item) => `<button class="btn btn-sm btn-info" onclick="window.showProfessorProfile('${item.id}')" title="Ver Perfil"><i class="fas fa-id-card"></i></button>`
+        },
+        {
+          header: 'Acciones',
+          field: 'id',
+          render: (item) => `
+            <div style="display:flex;gap:5px;justify-content:center;">
+              <button class="btn btn-sm btn-warning" onclick="window.showInviteModal('${item.id}')" title="Invitar (Gmail)"><i class="fas fa-envelope"></i></button>
+              <button class="btn btn-sm btn-primary" onclick="window.openProfModal('edit', '${item.id}')" title="Editar"><i class="fas fa-edit"></i></button>
+              <button class="btn btn-sm btn-danger" onclick="window.deleteProf('${item.id}')" title="Eliminar"><i class="fas fa-trash"></i></button>
+            </div>
+          `
         }
       ],
-      actions: { edit: true, delete: true },
-      onEdit: (id) => window.openProfModal('edit', id),
-      onDelete: (id) => window.deleteProf(id)
+      actions: {} // Desactivamos acciones automáticas para usar la columna personalizada
     });
   }
 }
@@ -523,8 +547,8 @@ window.showProfessorProfile = function (profId) {
           ` : ''}
         </div>
         
-        <button class="btn btn-primary" style="width:100%;margin-top:1rem;" onclick="window.sendEmailToProfessor('${prof.email}', '${prof.name.replace(/'/g, "\\'")}')">
-          <i class="fas fa-envelope"></i> Enviar Correo
+        <button class="btn btn-primary" style="width:100%;margin-top:1rem;" onclick="window.showInviteModal('${prof.id}')">
+          <i class="fas fa-envelope"></i> Enviar Invitación
         </button>
       </div>
     </div>
@@ -537,11 +561,66 @@ window.showProfessorProfile = function (profId) {
   };
 };
 
-// Función para enviar correo
+// Función para enviar correo desde el perfil (usando la misma lógica de invitación)
 window.sendEmailToProfessor = function (email, name) {
-  const subject = encodeURIComponent(`Mensaje para ${name}`);
-  const body = encodeURIComponent(`Estimado/a ${name},\n\n`);
+  const prof = store.professors.find(p => p.email === email);
+  if (prof) {
+    window.showInviteModal(prof.id);
+  } else {
+    const subject = encodeURIComponent("Comunicado Rekreo");
+    window.location.href = `mailto:${email}?subject=${subject}`;
+  }
+};
 
-  window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-  showNotification(`Abriendo cliente de correo para ${name}`);
+// Nueva Función: Modal de Invitación con Logo y Gmail
+window.showInviteModal = function (id) {
+  const prof = store.professors.find(p => p.id == id);
+  if (!prof) return;
+
+  const username = prof.identification || 'No definido';
+  const password = prof.identification || 'No definido';
+
+  const subject = "Bienvenido a Rekreo - Credenciales de Acceso";
+  const body = `Hola ${prof.name},\n\nTu cuenta ha sido creada exitosamente.\n\nUsuario: ${username}\nContraseña: ${password}\n\nPor favor ingresa al sistema y cambia tu contraseña inmediatamente.\n\nSaludos,\nAdministración.`;
+
+  // Enlace para Gmail Web
+  const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${prof.email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:500px; border-top: 5px solid #EAB308;">
+      <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center; padding-top:0;">
+        <img src="https://i.ibb.co/CdVPFkp/Logo-negro-fondo-blanco-UPN-03.png" alt="Logo UPN" style="max-width:150px; margin-bottom:1.5rem;">
+        
+        <h2 style="color:#1e293b; margin-bottom:0.5rem;">Enviar Credenciales</h2>
+        <p style="color:#64748b; margin-bottom:1.5rem;">Se enviarán los siguientes datos de acceso a <strong>${prof.email}</strong></p>
+        
+        <div style="background:#f1f5f9; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; text-align:left; border:1px solid #e2e8f0;">
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.25rem;">Usuario</label>
+            <div style="font-family:monospace; font-size:1.1rem; color:#0f172a; background:white; padding:0.5rem; border-radius:6px; border:1px solid #cbd5e1;">${username}</div>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.25rem;">Contraseña</label>
+            <div style="font-family:monospace; font-size:1.1rem; color:#0f172a; background:white; padding:0.5rem; border-radius:6px; border:1px solid #cbd5e1;">${password}</div>
+          </div>
+        </div>
+
+        <a href="${gmailLink}" target="_blank" class="btn btn-primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:0.5rem; font-size:1.1rem; padding:0.75rem;">
+          <i class="fas fa-envelope"></i> Redactar en Gmail
+        </a>
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:1rem;">Esto abrirá una nueva pestaña en Gmail con el mensaje pre-cargado.</p>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.querySelector('.modal-close').onclick = () => modal.remove();
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
 };
