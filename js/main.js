@@ -70,6 +70,13 @@ window.showDataSection = (sectionType) => {
 
     document.getElementById('headerTitle').textContent = titles[sectionType] || 'Gestión de Datos';
 
+    // Ocultar sección de perfil si está abierta
+    const profileSection = document.getElementById('profileSection');
+    if (profileSection) profileSection.style.display = 'none';
+
+    // Cerrar cualquier modal abierto
+    document.querySelectorAll('.modal-overlay').forEach(modal => modal.remove());
+
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('dataSection').style.display = 'block';
     document.getElementById('formSection').style.display = 'none';
