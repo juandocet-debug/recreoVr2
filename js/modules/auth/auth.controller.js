@@ -120,7 +120,7 @@ async function handleChangePassword(e, userId) {
         btn.textContent = 'Cambiando...';
         btn.disabled = true;
 
-        const response = await fetch('http://localhost:3001/api/change-password', {
+        const response = await fetch(`${window.API_URL}/api/change-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: userId, newPassword: newPass })
@@ -199,7 +199,7 @@ function filterSidebarByRole(userRole) {
 
 export async function fetchProfessors() {
     try {
-        const response = await window.authFetch('http://localhost:3001/api/professors');
+        const response = await window.authFetch('/api/professors');
         if (response.ok) {
             const json = await response.json();
             store.professors = json.data;
@@ -215,7 +215,7 @@ export async function logout() {
     try {
         const token = localStorage.getItem('authToken');
         if (token) {
-            await fetch('http://localhost:3001/api/logout', {
+            await fetch(`${window.API_URL}/api/logout`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
