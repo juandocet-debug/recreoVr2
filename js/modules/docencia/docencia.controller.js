@@ -24,7 +24,7 @@ export async function loadDocencia() {
 async function fetchActas() {
     try {
         // Build URL with optional user filtering
-        let url = 'http://localhost:3001/api/actas';
+        let url = '\/api/actas';
 
         // If user is logged in, pass their info for filtering
         if (store.currentUser) {
@@ -55,7 +55,7 @@ export async function openActaModal(actaId = null) {
     if (!store.usersForAutocomplete || store.usersForAutocomplete.length === 0) {
         window.showCustomAlert('Cargando datos...', 'Obteniendo lista de usuarios', 'loading');
         try {
-            const res = await window.authFetch('http://localhost:3001/api/users-autocomplete');
+            const res = await window.authFetch('\/api/users-autocomplete');
             if (res.ok) {
                 const json = await res.json();
                 store.usersForAutocomplete = json.data;
@@ -71,7 +71,7 @@ export async function openActaModal(actaId = null) {
 
     // Cargar categorías desde la API
     try {
-        const resCategories = await window.authFetch('http://localhost:3001/api/document-categories');
+        const resCategories = await window.authFetch('\/api/document-categories');
         if (resCategories.ok) {
             const jsonCategories = await resCategories.json();
             store.documentCategories = jsonCategories.data || [];
@@ -491,7 +491,7 @@ async function saveActa() {
     };
 
     try {
-        const url = currentActaId ? `http://localhost:3001/api/actas/${currentActaId}` : 'http://localhost:3001/api/actas';
+        const url = currentActaId ? `\/api/actas/${currentActaId}` : '\/api/actas';
         const method = currentActaId ? 'PUT' : 'POST';
         const res = await window.authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (res.ok) {
@@ -1354,7 +1354,7 @@ window.signActa = async (id) => {
                 signatureImage: signatureImageData
             };
 
-            const res = await window.authFetch(`http://localhost:3001/api/actas/${id}`, {
+            const res = await window.authFetch(`\/api/actas/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ signatures })
@@ -1384,7 +1384,7 @@ window.signActa = async (id) => {
 async function deleteActa(id) {
     if (await window.showCustomAlert('¿Eliminar?', 'Esta acción no se puede deshacer', 'warning', true)) {
         try {
-            const response = await window.authFetch(`http://localhost:3001/api/actas/${id}`, { method: 'DELETE' });
+            const response = await window.authFetch(`\/api/actas/${id}`, { method: 'DELETE' });
             if (response.ok) {
                 await window.showCustomAlert('¡Eliminado!', 'El acta ha sido eliminada correctamente', 'success');
                 loadDocencia();

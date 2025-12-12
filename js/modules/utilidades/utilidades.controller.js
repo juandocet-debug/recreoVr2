@@ -51,7 +51,7 @@ async function loadFaculties(btn, btnText) {
     if (tbody) tbody.innerHTML = '';
 
     try {
-        const res = await window.authFetch('http://localhost:3001/api/faculties');
+        const res = await window.authFetch('\/api/faculties');
         if (!res.ok) throw new Error('Error');
 
         const json = await res.json();
@@ -101,7 +101,7 @@ async function openFacultyModal(mode, id = null) {
         facultyForm.dataset.id = '';
     } else {
         try {
-            const res = await window.authFetch('http://localhost:3001/api/faculties');
+            const res = await window.authFetch('\/api/faculties');
             const json = await res.json();
             const faculty = json.data.find(f => f.id == id);
 
@@ -149,8 +149,8 @@ async function saveFaculty() {
 
     try {
         const url = form.dataset.mode === 'create'
-            ? 'http://localhost:3001/api/faculties'
-            : `http://localhost:3001/api/faculties/${form.dataset.id}`;
+            ? '\/api/faculties'
+            : `\/api/faculties/${form.dataset.id}`;
 
         const method = form.dataset.mode === 'create' ? 'POST' : 'PUT';
 
@@ -184,7 +184,7 @@ async function saveFaculty() {
 
 async function deleteFaculty(id) {
     try {
-        const resGet = await window.authFetch('http://localhost:3001/api/faculties');
+        const resGet = await window.authFetch('\/api/faculties');
         const jsonGet = await resGet.json();
         const faculty = jsonGet.data.find(f => f.id == id);
 
@@ -197,7 +197,7 @@ async function deleteFaculty(id) {
 
         if (!confirmed) return;
 
-        const res = await fetch(`http://localhost:3001/api/faculties/${id}`, {
+        const res = await fetch(`\/api/faculties/${id}`, {
             method: 'DELETE'
         });
 
@@ -234,7 +234,7 @@ async function loadPrograms(btn, btnText) {
     tbody.innerHTML = '';
 
     try {
-        const res = await window.authFetch('http://localhost:3001/api/programs');
+        const res = await window.authFetch('\/api/programs');
         if (!res.ok) throw new Error('Error');
 
         const json = await res.json();
@@ -288,7 +288,7 @@ async function openProgramModal(mode, id = null) {
         programForm.dataset.id = '';
     } else {
         try {
-            const res = await window.authFetch('http://localhost:3001/api/programs');
+            const res = await window.authFetch('\/api/programs');
             const json = await res.json();
             const program = json.data.find(p => p.id == id);
 
@@ -346,7 +346,7 @@ function createProgramForm() {
 async function populateFacultyDropdownInProgram() {
     const sel = document.getElementById('progFaculty');
     try {
-        const res = await window.authFetch('http://localhost:3001/api/faculties');
+        const res = await window.authFetch('\/api/faculties');
         const json = await res.json();
         const faculties = json.data || [];
         sel.innerHTML = '<option value="">-- Seleccionar Facultad --</option>' +
@@ -368,8 +368,8 @@ async function saveProgram() {
 
     try {
         const url = form.dataset.mode === 'create'
-            ? 'http://localhost:3001/api/programs'
-            : `http://localhost:3001/api/programs/${form.dataset.id}`;
+            ? '\/api/programs'
+            : `\/api/programs/${form.dataset.id}`;
 
         const method = form.dataset.mode === 'create' ? 'POST' : 'PUT';
 
@@ -403,7 +403,7 @@ async function saveProgram() {
 
 async function deleteProgram(id) {
     try {
-        const resGet = await window.authFetch('http://localhost:3001/api/programs');
+        const resGet = await window.authFetch('\/api/programs');
         const jsonGet = await resGet.json();
         const program = jsonGet.data.find(p => p.id == id);
 
@@ -416,7 +416,7 @@ async function deleteProgram(id) {
 
         if (!confirmed) return;
 
-        const res = await fetch(`http://localhost:3001/api/programs/${id}`, {
+        const res = await fetch(`\/api/programs/${id}`, {
             method: 'DELETE'
         });
 
@@ -572,7 +572,7 @@ async function loadCategories(btn, btnText) {
     if (tbody) tbody.innerHTML = '';
 
     try {
-        const res = await window.authFetch('http://localhost:3001/api/document-categories');
+        const res = await window.authFetch('\/api/document-categories');
         if (!res.ok) throw new Error('Error cargando categorías');
 
         const json = await res.json();
@@ -624,7 +624,7 @@ async function openCategoryModal(mode, id = null) {
         categoryForm.dataset.id = '';
     } else {
         try {
-            const res = await window.authFetch('http://localhost:3001/api/document-categories');
+            const res = await window.authFetch('\/api/document-categories');
             const json = await res.json();
             const category = json.data.find(c => c.id == id);
 
@@ -673,8 +673,8 @@ async function saveCategory() {
 
     try {
         const url = form.dataset.mode === 'create'
-            ? 'http://localhost:3001/api/document-categories'
-            : `http://localhost:3001/api/document-categories/${form.dataset.id}`;
+            ? '\/api/document-categories'
+            : `\/api/document-categories/${form.dataset.id}`;
 
         const method = form.dataset.mode === 'create' ? 'POST' : 'PUT';
 
@@ -709,7 +709,7 @@ async function saveCategory() {
 async function deleteCategory(id) {
     try {
         // Primero obtener info de la categoría para mostrar mensaje informativo
-        const resGet = await window.authFetch('http://localhost:3001/api/document-categories');
+        const resGet = await window.authFetch('\/api/document-categories');
         const jsonGet = await resGet.json();
         const category = jsonGet.data.find(c => c.id == id);
 
@@ -722,7 +722,7 @@ async function deleteCategory(id) {
 
         if (!confirmed) return;
 
-        const res = await fetch(`http://localhost:3001/api/document-categories/${id}`, {
+        const res = await fetch(`\/api/document-categories/${id}`, {
             method: 'DELETE'
         });
 

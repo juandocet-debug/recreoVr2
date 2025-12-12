@@ -362,7 +362,7 @@ window.saveProfile = async function () {
     try {
         window.showCustomAlert('Guardando...', 'Actualizando tu perfil', 'loading');
 
-        const res = await window.authFetch('http://localhost:3001/api/profile', {
+        const res = await window.authFetch('\/api/profile', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)

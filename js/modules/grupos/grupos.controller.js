@@ -34,7 +34,7 @@ export async function loadGrupos() {
     }
 
     try {
-        const res = await window.authFetch('http://localhost:3001/api/groups');
+        const res = await window.authFetch('\/api/groups');
         if (!res.ok) throw new Error('Error cargando grupos');
 
         const json = await res.json();
@@ -160,7 +160,7 @@ async function openGroupModal(groupId = null) {
 
     if (groupId) {
         try {
-            const res = await window.authFetch('http://localhost:3001/api/groups');
+            const res = await window.authFetch('\/api/groups');
             const json = await res.json();
             const group = json.data.find(g => g.id === groupId);
 
@@ -386,7 +386,7 @@ function createGroupForm(groupId = null) {
 
 async function loadFacultiesForGroup() {
     try {
-        const res = await window.authFetch('http://localhost:3001/api/faculties');
+        const res = await window.authFetch('\/api/faculties');
         const json = await res.json();
         const faculties = json.data || [];
 
@@ -411,7 +411,7 @@ function setupFacultyProgramLink() {
         }
 
         try {
-            const res = await window.authFetch('http://localhost:3001/api/programs');
+            const res = await window.authFetch('\/api/programs');
             const json = await res.json();
             const programs = json.data.filter(p => p.faculty_id == facultyId);
 
@@ -550,7 +550,7 @@ async function saveGroup() {
 
     // Si estamos editando, obtener documentos existentes
     try {
-        const checkRes = await window.authFetch('http://localhost:3001/api/groups');
+        const checkRes = await window.authFetch('\/api/groups');
         const checkJson = await checkRes.json();
         const existingGroup = checkJson.data.find(g => g.id === groupId);
 
@@ -608,13 +608,13 @@ async function saveGroup() {
 
     try {
         // Verificar si existe
-        const checkRes = await window.authFetch('http://localhost:3001/api/groups');
+        const checkRes = await window.authFetch('\/api/groups');
         const checkJson = await checkRes.json();
         const exists = checkJson.data.find(g => g.id === groupId);
 
         const url = exists
-            ? `http://localhost:3001/api/groups/${groupId}`
-            : 'http://localhost:3001/api/groups';
+            ? `\/api/groups/${groupId}`
+            : '\/api/groups';
         const method = exists ? 'PUT' : 'POST';
 
         const res = await fetch(url, {
@@ -651,7 +651,7 @@ async function deleteGroup(id) {
 
         if (!confirmed) return;
 
-        const res = await fetch(`http://localhost:3001/api/groups/${id}`, {
+        const res = await fetch(`\/api/groups/${id}`, {
             method: 'DELETE'
         });
 
@@ -675,14 +675,14 @@ async function deleteGroup(id) {
 window.viewGroupStudents = async function (groupId, readOnly = false) {
     try {
         // Obtener grupo
-        const resGroup = await window.authFetch('http://localhost:3001/api/groups');
+        const resGroup = await window.authFetch('\/api/groups');
         const jsonGroup = await resGroup.json();
         const group = jsonGroup.data.find(g => g.id === groupId);
 
         if (!group) return;
 
         // Obtener estudiantes del grupo
-        const resStudents = await fetch(`http://localhost:3001/api/groups/${groupId}/students`);
+        const resStudents = await fetch(`\/api/groups/${groupId}/students`);
         const jsonStudents = await resStudents.json();
         const students = jsonStudents.data || [];
 
@@ -1069,7 +1069,7 @@ Coordinación Académica
 
 window.inviteStudents = async function (groupId) {
     try {
-        const resGroup = await window.authFetch('http://localhost:3001/api/groups');
+        const resGroup = await window.authFetch('\/api/groups');
         const jsonGroup = await resGroup.json();
         const group = jsonGroup.data.find(g => g.id === groupId);
 
@@ -1174,7 +1174,7 @@ window.saveGroupDocuments = async function (groupId) {
 
     try {
         // Obtener grupo actual
-        const resGet = await window.authFetch('http://localhost:3001/api/groups');
+        const resGet = await window.authFetch('\/api/groups');
         const jsonGet = await resGet.json();
         const group = jsonGet.data.find(g => g.id === groupId);
 
@@ -1211,7 +1211,7 @@ window.saveGroupDocuments = async function (groupId) {
         }
 
         // Actualizar grupo
-        const res = await fetch(`http://localhost:3001/api/groups/${groupId}`, {
+        const res = await fetch(`\/api/groups/${groupId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1237,7 +1237,7 @@ window.saveGroupDocuments = async function (groupId) {
 
 window.viewDocument = async function (groupId, docIndex) {
     try {
-        const resGet = await window.authFetch('http://localhost:3001/api/groups');
+        const resGet = await window.authFetch('\/api/groups');
         const jsonGet = await resGet.json();
         const group = jsonGet.data.find(g => g.id === groupId);
 
@@ -1277,7 +1277,7 @@ window.viewDocument = async function (groupId, docIndex) {
 
 window.downloadDocument = async function (groupId, docIndex) {
     try {
-        const resGet = await window.authFetch('http://localhost:3001/api/groups');
+        const resGet = await window.authFetch('\/api/groups');
         const jsonGet = await resGet.json();
         const group = jsonGet.data.find(g => g.id === groupId);
 
@@ -1304,7 +1304,7 @@ window.downloadDocument = async function (groupId, docIndex) {
 
 window.printDocument = async function (groupId, docIndex) {
     try {
-        const resGet = await window.authFetch('http://localhost:3001/api/groups');
+        const resGet = await window.authFetch('\/api/groups');
         const jsonGet = await resGet.json();
         const group = jsonGet.data.find(g => g.id === groupId);
 
@@ -1355,7 +1355,7 @@ window.removeGroupDocument = async function (groupId, docIndex) {
         if (!confirmed) return;
 
         // Obtener grupo
-        const resGet = await window.authFetch('http://localhost:3001/api/groups');
+        const resGet = await window.authFetch('\/api/groups');
         const jsonGet = await resGet.json();
         const group = jsonGet.data.find(g => g.id === groupId);
 
@@ -1367,7 +1367,7 @@ window.removeGroupDocument = async function (groupId, docIndex) {
         docs.splice(docIndex, 1);
 
         // Actualizar grupo
-        const res = await fetch(`http://localhost:3001/api/groups/${groupId}`, {
+        const res = await fetch(`\/api/groups/${groupId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1481,7 +1481,7 @@ function loadExistingAdvisors(advisorsData) {
 
 window.showGroupControl = async function (groupId) {
     try {
-        const res = await window.authFetch('http://localhost:3001/api/groups');
+        const res = await window.authFetch('\/api/groups');
         const json = await res.json();
         const group = json.data.find(g => g.id === groupId);
 
@@ -1692,7 +1692,7 @@ window.openStudentForm = async function (groupId) {
                 document.getElementById('availableStudentsList').innerHTML =
                     '<p style="text-align:center;color:#666;padding:2rem;"><i class="fas fa-spinner fa-spin"></i> Buscando...</p>';
 
-                const res = await window.authFetch('http://localhost:3001/api/students/available');
+                const res = await window.authFetch('\/api/students/available');
                 const json = await res.json();
                 const available = json.data || [];
 
@@ -1738,7 +1738,7 @@ function renderStudentResults(students, groupId) {
 
 window.assignStudentToGroup = async function (studentId, groupId) {
     try {
-        const res = await fetch(`http://localhost:3001/api/students/${studentId}/assign-group`, {
+        const res = await fetch(`\/api/students/${studentId}/assign-group`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ group_id: groupId })
@@ -1774,7 +1774,7 @@ window.removeStudentFromGroup = async function (studentId, groupId) {
 
         if (!confirmed) return;
 
-        const res = await fetch(`http://localhost:3001/api/students/${studentId}/remove-from-group`, {
+        const res = await fetch(`\/api/students/${studentId}/remove-from-group`, {
             method: 'PUT'
         });
 
@@ -1872,7 +1872,7 @@ window.processImport = async function (groupId) {
 
             try {
                 // Crear usuario estudiante
-                const res = await window.authFetch('http://localhost:3001/api/register', {
+                const res = await window.authFetch('\/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

@@ -365,8 +365,8 @@ async function saveProfessor() {
 
   try {
     const url = currentProfessorId
-      ? `http://localhost:3001/api/professors/${currentProfessorId}`
-      : 'http://localhost:3001/api/professors';
+      ? `/api/professors/${currentProfessorId}`
+      : '/api/professors';
 
     const method = currentProfessorId ? 'PUT' : 'POST';
 
@@ -398,7 +398,7 @@ async function saveProfessor() {
 
       // Reload data manually
       try {
-        const res = await window.authFetch('http://localhost:3001/api/professors');
+        const res = await window.authFetch('/api/professors');
         if (res.ok) {
           const json = await res.json();
           store.professors = json.data;
@@ -456,7 +456,7 @@ async function deleteProf(id) {
       const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500));
       window.showCustomAlert('Eliminando...', 'Por favor espere.', 'loading');
 
-      const response = await window.authFetch(`http://localhost:3001/api/professors/${id}`, {
+      const response = await window.authFetch(`/api/professors/${id}`, {
         method: 'DELETE'
       });
 
@@ -467,7 +467,7 @@ async function deleteProf(id) {
 
         // Reload data manually
         try {
-          const res = await window.authFetch('http://localhost:3001/api/professors');
+          const res = await window.authFetch('/api/professors');
           if (res.ok) {
             const json = await res.json();
             store.professors = json.data;
