@@ -64,7 +64,7 @@ window.showDataSection = (sectionType) => {
     const titles = {
         acta: 'Registro de Actas Estudiantiles',
         'admin-grupos': 'Administración de Grupos',
-        'roles-permisos': 'Gestión de Profesores',
+        'roles-permisos': 'Usuarios',
         'utilidades': 'Configuración y Utilidades'
     };
 

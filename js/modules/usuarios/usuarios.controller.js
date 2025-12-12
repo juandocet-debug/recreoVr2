@@ -334,8 +334,6 @@ async function saveProfessor() {
   }
 
   // ========== PROCEDER CON GUARDADO ==========
-  const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500));
-  window.showCustomAlert('Procesando...', 'Por favor espere mientras guardamos los cambios.', 'loading');
 
   const btn = document.getElementById('btnSaveProfessor');
   const originalText = btn.innerHTML;
@@ -376,25 +374,12 @@ async function saveProfessor() {
       body: JSON.stringify(professorData)
     });
 
-    // Wait for the minimum delay
-    await loadingPromise;
-
     const resJson = await response.json();
     console.log('Server Response:', resJson);
 
     if (response.ok) {
-      if (resJson.credentials) {
-        console.log('Credentials found, showing modal...'); // DEBUG
-        const email = professorData.email;
-        const name = professorData.name;
-        const username = resJson.credentials.username;
-        const password = resJson.credentials.password;
-
-        // Show Manual Credentials Modal
-        showCredentialsModal(name, email, username, password);
-      } else {
-        await window.showCustomAlert('¡Guardado!', 'Usuario guardado exitosamente', 'success');
-      }
+      // Usuario guardado - ir directo a la lista sin modal
+      console.log('Usuario guardado correctamente');
 
       // Reload data manually
       try {
@@ -412,7 +397,7 @@ async function saveProfessor() {
             document.getElementById('dashboard').style.display = 'none';
             document.getElementById('dataSection').style.display = 'block';
             document.getElementById('formSection').style.display = 'none';
-            document.getElementById('sectionTitle').textContent = 'Gestión de Usuarios';
+            document.getElementById('sectionTitle').textContent = 'Usuarios';
           }
         }
       } catch (err) {
