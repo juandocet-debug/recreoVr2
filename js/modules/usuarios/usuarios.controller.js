@@ -440,6 +440,59 @@ async function saveProfessor() {
   }
 }
 
+// Modal para mostrar credenciales generadas al crear un nuevo usuario
+function showCredentialsModal(name, email, username, password) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:480px; border-top: 5px solid #38a169;">
+      <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center; padding-top:0;">
+        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#38a169,#48bb78);margin:0 auto 1.5rem;display:flex;align-items:center;justify-content:center;">
+          <i class="fas fa-user-check" style="font-size:2.5rem;color:white;"></i>
+        </div>
+        
+        <h2 style="color:#1e293b; margin-bottom:0.5rem;">¡Usuario Creado!</h2>
+        <p style="color:#64748b; margin-bottom:1.5rem;">Se han generado las credenciales para <strong>${name}</strong></p>
+        
+        <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; text-align:left;">
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.75rem; color:#166534; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.25rem;">Usuario</label>
+            <div style="font-family:monospace; font-size:1.1rem; color:#14532d; background:white; padding:0.75rem; border-radius:8px; border:1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center;">
+              <span id="credUsername">${username}</span>
+              <button onclick="navigator.clipboard.writeText('${username}'); this.innerHTML='<i class=\\'fas fa-check\\'></i>'; setTimeout(()=>this.innerHTML='<i class=\\'fas fa-copy\\'></i>',1500)" style="background:none;border:none;color:#22c55e;cursor:pointer;padding:5px;"><i class="fas fa-copy"></i></button>
+            </div>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; color:#166534; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.25rem;">Contraseña Temporal</label>
+            <div style="font-family:monospace; font-size:1.1rem; color:#14532d; background:white; padding:0.75rem; border-radius:8px; border:1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center;">
+              <span id="credPassword">${password}</span>
+              <button onclick="navigator.clipboard.writeText('${password}'); this.innerHTML='<i class=\\'fas fa-check\\'></i>'; setTimeout(()=>this.innerHTML='<i class=\\'fas fa-copy\\'></i>',1500)" style="background:none;border:none;color:#22c55e;cursor:pointer;padding:5px;"><i class="fas fa-copy"></i></button>
+            </div>
+          </div>
+        </div>
+        
+        <p style="font-size:0.85rem; color:#64748b; margin-bottom:1rem;">
+          <i class="fas fa-info-circle" style="color:#3b82f6;"></i> 
+          El usuario deberá cambiar su contraseña en el primer inicio de sesión.
+        </p>
+        
+        <button class="btn btn-primary" style="width:100%;" onclick="this.closest('.modal-overlay').remove()">
+          <i class="fas fa-check"></i> Entendido
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.querySelector('.modal-close').onclick = () => modal.remove();
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
+}
+
 window.openProfModal = openProfModal;
 
 async function deleteProf(id) {
