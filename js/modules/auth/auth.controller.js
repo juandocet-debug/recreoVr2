@@ -46,7 +46,7 @@ async function handleLogin(e) {
         btn.textContent = 'Verificando...';
         btn.disabled = true;
 
-        const response = await fetch('http://localhost:3001/api/login', {
+        const response = await fetch(`${window.API_URL}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: u, password: p, role: r })
@@ -95,7 +95,7 @@ async function handleLogin(e) {
 
     } catch (error) {
         console.error('Login error:', error);
-        alert('Error de conexión con el servidor. Asegúrate de que el backend esté corriendo en el puerto 3000.\n\nEjecuta: node server/app.js');
+        alert('Error de conexión con el servidor. Por favor, intenta de nuevo.');
         const btn = e.target.querySelector('button');
         if (btn) {
             btn.textContent = 'Ingresar';
