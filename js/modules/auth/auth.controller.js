@@ -13,7 +13,7 @@ export async function initAuth() {
     if (savedUser && savedToken) {
         try {
             // Verificar si el token sigue válido en el servidor
-            const verifyRes = await fetch('http://localhost:3001/api/verify-session', {
+            const verifyRes = await fetch(`${window.API_URL}/api/verify-session`, {
                 headers: { 'Authorization': `Bearer ${savedToken}` }
             });
 

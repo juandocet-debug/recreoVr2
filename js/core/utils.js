@@ -130,6 +130,17 @@ export async function authFetch(url, options = {}) {
         throw new Error('No hay sesión activa');
     }
 
+    // Construir URL completa si es relativa
+    // Limpiar caracteres de escape \/ que quedaron
+    let cleanUrl = url.replace(/\\\//g, '/');
+    let fullUrl = cleanUrl;
+
+    if (cleanUrl.startsWith('/')) {
+        fullUrl = (window.API_URL || '') + cleanUrl;
+    } else if (!cleanUrl.startsWith('http')) {
+        fullUrl = (window.API_URL || '') + '/' + cleanUrl;
+    }
+
     // Agregar token al header
     const headers = {
         ...options.headers,
@@ -141,7 +152,7 @@ export async function authFetch(url, options = {}) {
         headers['Content-Type'] = 'application/json';
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(fullUrl, {
         ...options,
         headers
     });
