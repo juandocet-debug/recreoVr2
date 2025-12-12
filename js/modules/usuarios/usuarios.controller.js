@@ -212,7 +212,7 @@ function injectPremiumForm() {
 }
 
 function loadProfessorData(id) {
-  const prof = store.professors.find(p => p.id === id);
+  const prof = store.professors.find(p => p.id == id);
   if (!prof) return;
 
   if (prof.firstName) {
@@ -251,8 +251,90 @@ function loadProfessorData(id) {
 }
 
 async function saveProfessor() {
-  // Show loading alert with a minimum display time promise
-  const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500)); // 1.5s minimum delay
+  // ========== VALIDACIÓN INLINE DEL FRONTEND ==========
+  let hasErrors = false;
+
+  // Helper para mostrar/limpiar error en un campo
+  function showFieldError(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+
+    field.style.borderColor = '#e53e3e';
+    field.style.boxShadow = '0 0 0 3px rgba(229, 62, 62, 0.2)';
+
+    // Crear o actualizar mensaje de error
+    let errorEl = field.parentElement.querySelector('.field-error');
+    if (!errorEl) {
+      errorEl = document.createElement('span');
+      errorEl.className = 'field-error';
+      errorEl.style.cssText = 'color: #e53e3e; font-size: 12px; display: block; margin-top: 4px;';
+      field.parentElement.appendChild(errorEl);
+    }
+    errorEl.textContent = message;
+    hasErrors = true;
+  }
+
+  function clearFieldError(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+
+    field.style.borderColor = '';
+    field.style.boxShadow = '';
+
+    const errorEl = field.parentElement.querySelector('.field-error');
+    if (errorEl) errorEl.remove();
+  }
+
+  // Limpiar errores anteriores
+  ['profFirstName', 'profLastName1', 'profIdNum', 'profEmail', 'profPhone', 'profRole'].forEach(clearFieldError);
+
+  // Obtener valores
+  const firstName = document.getElementById('profFirstName').value.trim();
+  const lastName1 = document.getElementById('profLastName1').value.trim();
+  const identification = document.getElementById('profIdNum').value.trim();
+  const email = document.getElementById('profEmail').value.trim();
+  const phone = document.getElementById('profPhone').value.trim();
+  const role = document.getElementById('profRole').value;
+
+  // Validar cada campo
+  if (!firstName || firstName.length < 2) {
+    showFieldError('profFirstName', 'Mínimo 2 caracteres');
+  }
+
+  if (!lastName1 || lastName1.length < 2) {
+    showFieldError('profLastName1', 'Mínimo 2 caracteres');
+  }
+
+  if (!identification) {
+    showFieldError('profIdNum', 'Campo requerido');
+  } else if (identification.length < 5 || identification.length > 20) {
+    showFieldError('profIdNum', 'Entre 5 y 20 caracteres');
+  }
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showFieldError('profEmail', 'Formato de email inválido');
+  }
+
+  if (phone && !/^[0-9\s\-\+\(\)]{7,20}$/.test(phone)) {
+    showFieldError('profPhone', 'Formato inválido (7-20 dígitos)');
+  }
+
+  const validRoles = ['administrador', 'coordinador', 'profesor', 'estudiante'];
+  if (!validRoles.includes(role)) {
+    showFieldError('profRole', 'Seleccione un rol válido');
+  }
+
+  // Si hay errores, hacer scroll al primero y no continuar
+  if (hasErrors) {
+    const firstError = document.querySelector('.field-error');
+    if (firstError) {
+      firstError.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
+
+  // ========== PROCEDER CON GUARDADO ==========
+  const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500));
   window.showCustomAlert('Procesando...', 'Por favor espere mientras guardamos los cambios.', 'loading');
 
   const btn = document.getElementById('btnSaveProfessor');
@@ -263,9 +345,8 @@ async function saveProfessor() {
   const preview = document.getElementById('profPhotoPreview');
   const photoData = preview.style.display !== 'none' ? preview.src : null;
 
-  const firstName = document.getElementById('profFirstName').value;
-  const lastName1 = document.getElementById('profLastName1').value;
-  const lastName2 = document.getElementById('profLastName2').value;
+  // Usar firstName/lastName1 ya declarados arriba en validación
+  const lastName2 = document.getElementById('profLastName2').value.trim();
 
   const professorData = {
     id: currentProfessorId || 'P-' + Date.now(),
@@ -289,7 +370,7 @@ async function saveProfessor() {
 
     const method = currentProfessorId ? 'PUT' : 'POST';
 
-    const response = await fetch(url, {
+    const response = await window.authFetch(url, {
       method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(professorData)
@@ -299,9 +380,7 @@ async function saveProfessor() {
     await loadingPromise;
 
     const resJson = await response.json();
-    console.log('Server Response:', resJson); // DEBUG
-    // FORCE DEBUG ALERT
-    window.alert('DEBUG SERVER RESPONSE:\n' + JSON.stringify(resJson, null, 2));
+    console.log('Server Response:', resJson);
 
     if (response.ok) {
       if (resJson.credentials) {
@@ -319,7 +398,7 @@ async function saveProfessor() {
 
       // Reload data manually
       try {
-        const res = await fetch('http://localhost:3001/api/professors');
+        const res = await window.authFetch('http://localhost:3001/api/professors');
         if (res.ok) {
           const json = await res.json();
           store.professors = json.data;
@@ -340,8 +419,8 @@ async function saveProfessor() {
         console.error("Error reloading data:", err);
       }
     } else {
-      const err = await response.json();
-      window.showCustomAlert('Error', 'Error al guardar: ' + (err.error || err.message), 'error');
+      // Usar resJson que ya fue parseado arriba
+      window.showCustomAlert('Error', 'Error al guardar: ' + (resJson.error || resJson.message || JSON.stringify(resJson.details)), 'error');
     }
   } catch (e) {
     console.error(e);
@@ -377,7 +456,7 @@ async function deleteProf(id) {
       const loadingPromise = new Promise(resolve => setTimeout(resolve, 1500));
       window.showCustomAlert('Eliminando...', 'Por favor espere.', 'loading');
 
-      const response = await fetch(`http://localhost:3001/api/professors/${id}`, {
+      const response = await window.authFetch(`http://localhost:3001/api/professors/${id}`, {
         method: 'DELETE'
       });
 
@@ -388,7 +467,7 @@ async function deleteProf(id) {
 
         // Reload data manually
         try {
-          const res = await fetch('http://localhost:3001/api/professors');
+          const res = await window.authFetch('http://localhost:3001/api/professors');
           if (res.ok) {
             const json = await res.json();
             store.professors = json.data;
@@ -624,3 +703,11 @@ window.showInviteModal = function (id) {
     if (e.target === modal) modal.remove();
   };
 };
+
+
+
+
+
+
+
+

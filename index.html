@@ -7,9 +7,9 @@
   <title>Recreo - Sistema de Gestión Académica</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/plans.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="js/config.js"></script>
 </head>
 
 <body>
@@ -47,63 +47,54 @@
       <div class="sidebar-header">
         <div class="sidebar-logo"><i class="fas fa-graduation-cap"></i></div>
         <div class="sidebar-title">Recreo</div>
+        <button class="sidebar-toggle" id="sidebarToggle">
+          <i class="fas fa-chevron-left"></i>
+        </button>
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" onclick="showSection('dashboard')">
           <i class="fas fa-home"></i><span class="nav-text">Inicio</span>
         </a>
 
-        <!-- Gestión de la Docencia -->
-        <a href="#" class="nav-item">
+        <!-- Mi Perfil - TODOS los roles (primero) -->
+        <a href="#" class="nav-item" onclick="showSection('profile')"
+          data-roles="administrador,coordinador,profesor,estudiante">
+          <i class="fas fa-user-circle"></i><span class="nav-text">Mi Perfil</span>
+        </a>
+
+        <!-- Gestión de la Docencia - TODOS pueden ver -->
+        <a href="#" class="nav-item" data-roles="administrador,coordinador,profesor,estudiante">
           <i class="fas fa-chalkboard-teacher"></i>
           <span class="nav-text">Gestión de la Docencia</span>
-          <i class="fas fa-chevron-down nav-arrow"></i>
+          <i class="fas fa-angle-down nav-arrow"></i>
         </a>
-        <div class="submenu">
+        <div class="submenu" data-roles="administrador,coordinador,profesor,estudiante">
           <a href="#" class="nav-item" onclick="showDataSection('acta')">
             <i class="fas fa-file-signature"></i><span class="nav-text">Registro de Actas</span>
           </a>
-          <a href="#" class="nav-item" onclick="showDataSection('plan-trabajo')">
-            <i class="fas fa-clipboard-list"></i><span class="nav-text">Plan de Trabajo</span>
-          </a>
         </div>
 
-        <!-- Prácticas -->
-        <a href="#" class="nav-item">
-          <i class="fas fa-briefcase"></i>
-          <span class="nav-text">Prácticas</span>
-          <i class="fas fa-chevron-down nav-arrow"></i>
-        </a>
-        <div class="submenu">
-          <a href="#" class="nav-item" onclick="showDataSection('sites')">
-            <i class="fas fa-building"></i><span class="nav-text">Administrar Sitio de Práctica</span>
-          </a>
-        </div>
-
-        <!-- Gestión de Usuarios -->
-        <a href="#" class="nav-item">
-          <i class="fas fa-users-cog"></i>
+        <!-- Gestión de Usuarios - SOLO admin y coordinador -->
+        <a href="#" class="nav-item" data-roles="administrador,coordinador">
+          <i class="fas fa-user-shield"></i>
           <span class="nav-text">Gestión de Usuarios</span>
-          <i class="fas fa-chevron-down nav-arrow"></i>
+          <i class="fas fa-angle-down nav-arrow"></i>
         </a>
-        <div class="submenu">
+        <div class="submenu" data-roles="administrador,coordinador">
           <a href="#" class="nav-item" onclick="showDataSection('roles-permisos')">
-            <i class="fas fa-users"></i><span class="nav-text">Usuarios</span>
+            <i class="fas fa-id-card"></i><span class="nav-text">Usuarios</span>
           </a>
         </div>
 
-        <!-- Accesos directos existentes -->
-        <a href="#" class="nav-item" onclick="showDataSection('documentos')">
-          <i class="fas fa-folder-plus"></i><span class="nav-text">Gestión de Documentos</span>
+        <!-- Administración de Grupos - admin y coordinador ven todo, profesor ve "Mis Grupos" -->
+        <a href="#" class="nav-item" onclick="showDataSection('admin-grupos')"
+          data-roles="administrador,coordinador,profesor">
+          <i class="fas fa-layer-group"></i><span class="nav-text" id="gruposNavText">Administración de Grupos</span>
         </a>
-        <a href="#" class="nav-item" onclick="showDataSection('admin-grupos')">
-          <i class="fas fa-users-cog"></i><span class="nav-text">Administración de Grupos</span>
-        </a>
-        <a href="#" class="nav-item" onclick="showDataSection('utilidades')">
+
+        <!-- Configuración - SOLO admin -->
+        <a href="#" class="nav-item" onclick="showDataSection('utilidades')" data-roles="administrador">
           <i class="fas fa-cog"></i><span class="nav-text">Configuración</span>
-        </a>
-        <a href="#" class="nav-item" onclick="showDataSection('plan-mejoramiento')">
-          <i class="fas fa-chart-line"></i><span class="nav-text">Plan de Mejoramiento</span>
         </a>
       </nav>
     </div>
@@ -130,16 +121,6 @@
               </div>
               <ul>
                 <li><a href="#" onclick="showDataSection('acta')">Registro de actas estudiantes</a></li>
-                <li><a href="#" onclick="showDataSection('plan-trabajo')">Plan de Trabajo Docente</a></li>
-              </ul>
-            </div>
-            <div class="dashboard-card">
-              <div class="card-header">
-                <div class="card-icon theme-practicas"><i class="fas fa-folder-plus"></i></div>
-                <div class="card-title">Documentos</div>
-              </div>
-              <ul>
-                <li><a href="#" onclick="showDataSection('documentos')">Gestión de Documentos</a></li>
               </ul>
             </div>
             <div class="dashboard-card">
@@ -166,7 +147,6 @@
         <div id="dataSection" class="data-section" style="display:none;">
           <div class="section-header">
             <div>
-              <h2 class="section-title" id="sectionTitle">Gestión de Datos</h2>
               <button class="btn btn-secondary" onclick="showSection('dashboard')"><i class="fas fa-arrow-left"></i>
                 Volver</button>
             </div>
@@ -181,6 +161,72 @@
           </table>
         </div>
 
+        <!-- Sección Mi Perfil -->
+        <div id="profileSection" class="data-section" style="display:none;">
+          <div class="profile-container" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div class="profile-header" style="text-align: center; margin-bottom: 30px;">
+              <div id="profilePhotoPreview"
+                style="width: 150px; height: 150px; border-radius: 50%; margin: 0 auto 15px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 4px solid #667eea;">
+                <i class="fas fa-user" style="font-size: 60px; color: #a0aec0;"></i>
+              </div>
+              <label for="profilePhotoInput" class="btn btn-primary" style="cursor: pointer;">
+                <i class="fas fa-camera"></i> Cambiar Foto
+              </label>
+              <input type="file" id="profilePhotoInput" accept="image/*" style="display: none;">
+            </div>
+
+            <form id="profileForm">
+              <div class="form-group" style="margin-bottom: 15px;">
+                <label for="profileName"><i class="fas fa-user"></i> Nombre Completo</label>
+                <input type="text" id="profileName" class="form-control" placeholder="Tu nombre completo">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 15px;">
+                <label for="profileEmail"><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                <input type="email" id="profileEmail" class="form-control" placeholder="tu@email.com">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 15px;">
+                <label for="profilePhone"><i class="fas fa-phone"></i> Teléfono</label>
+                <input type="tel" id="profilePhone" class="form-control" placeholder="3001234567">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 15px;">
+                <label for="profileIdentification"><i class="fas fa-id-card"></i> Identificación</label>
+                <input type="text" id="profileIdentification" class="form-control" readonly
+                  style="background: #f5f5f5;">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 15px;">
+                <label for="profileRole"><i class="fas fa-user-tag"></i> Rol</label>
+                <input type="text" id="profileRole" class="form-control" readonly style="background: #f5f5f5;">
+              </div>
+
+              <hr style="margin: 25px 0;">
+
+              <h4 style="margin-bottom: 15px;"><i class="fas fa-key"></i> Cambiar Contraseña (opcional)</h4>
+              <div class="form-group" style="margin-bottom: 15px;">
+                <label for="profileNewPassword">Nueva Contraseña</label>
+                <input type="password" id="profileNewPassword" class="form-control"
+                  placeholder="Dejar vacío para no cambiar">
+              </div>
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label for="profileConfirmPassword">Confirmar Contraseña</label>
+                <input type="password" id="profileConfirmPassword" class="form-control"
+                  placeholder="Confirmar nueva contraseña">
+              </div>
+
+              <div style="display: flex; gap: 10px; justify-content: center;">
+                <button type="button" class="btn btn-secondary" onclick="showSection('dashboard')">
+                  <i class="fas fa-arrow-left"></i> Volver
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveProfile()">
+                  <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
         <div id="formSection" class="data-section" style="display:none;">
           <div class="section-header" id="section-header">
             <div>

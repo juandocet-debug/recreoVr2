@@ -17,10 +17,8 @@ export function loadUtilidades() {
     utilityTabs.innerHTML = `
         <button class="utility-tab-btn ${currentUtilityType === 'faculties' ? 'active' : ''}" data-type="faculties">Facultades</button>
         <button class="utility-tab-btn ${currentUtilityType === 'programs' ? 'active' : ''}" data-type="programs">Programas</button>
-        <button class="utility-tab-btn ${currentUtilityType === 'subjects' ? 'active' : ''}" data-type="subjects">Asignaturas</button>
-        <button class="utility-tab-btn ${currentUtilityType === 'activities' ? 'active' : ''}" data-type="activities">Actividades</button>
-        <button class="utility-tab-btn ${currentUtilityType === 'delivery' ? 'active' : ''}" data-type="delivery">Formas de Entrega</button>
-        <button class="utility-tab-btn ${currentUtilityType === 'verification' ? 'active' : ''}" data-type="verification">Medios de Verificación</button>
+        <button class="utility-tab-btn ${currentUtilityType === 'documents' ? 'active' : ''}" data-type="documents">Gestión de Documentos</button>
+        <button class="utility-tab-btn ${currentUtilityType === 'categories' ? 'active' : ''}" data-type="categories">Categorías</button>
     `;
     dataSection.querySelector('.section-header').after(utilityTabs);
 
@@ -33,17 +31,15 @@ export function loadUtilidades() {
 
     if (currentUtilityType === 'faculties') loadFaculties(btn, btnText);
     else if (currentUtilityType === 'programs') loadPrograms(btn, btnText);
-    else if (currentUtilityType === 'subjects') loadSubjects(btn, btnText);
-    else if (currentUtilityType === 'activities') loadActivities(btn, btnText);
-    else if (currentUtilityType === 'delivery') loadDeliveryForms(btn, btnText);
-    else loadVerificationMeans(btn, btnText);
+    else if (currentUtilityType === 'documents') loadDocuments(btn, btnText);
+    else if (currentUtilityType === 'categories') loadCategories(btn, btnText);
 }
 
 /* -------------------------------------------------------------------------- */
 /*                                 FACULTADES                                 */
 /* -------------------------------------------------------------------------- */
 
-function loadFaculties(btn, btnText) {
+async function loadFaculties(btn, btnText) {
     if (btnText) btnText.textContent = 'Nueva Facultad';
     if (btn) btn.onclick = () => openFacultyModal('create');
 
@@ -54,32 +50,39 @@ function loadFaculties(btn, btnText) {
     if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
     if (tbody) tbody.innerHTML = '';
 
-    const faculties = store.faculties || [];
-    if (!faculties.length && tbody) {
-        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay facultades registradas.</td></tr>`;
-        return;
-    }
+    try {
+        const res = await window.authFetch('http://localhost:3001/api/faculties');
+        if (!res.ok) throw new Error('Error');
 
-    faculties.forEach(fac => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${fac.name}</td>
-            <td>${fac.description || 'N/A'}</td>
-            <td>
-                <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
-                <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
-            </td>
-        `;
-        tr.querySelector('.edit-btn').addEventListener('click', () => openFacultyModal('edit', fac.id));
-        tr.querySelector('.delete-btn').addEventListener('click', () => deleteFaculty(fac.id));
-        tbody.appendChild(tr);
-    });
+        const json = await res.json();
+        const faculties = json.data || [];
+
+        if (!faculties.length && tbody) {
+            tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay facultades.</td></tr>`;
+            return;
+        }
+
+        faculties.forEach(fac => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${fac.name}</td>
+                <td>${fac.description || 'N/A'}</td>
+                <td>
+                    <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
+                    <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
+                </td>
+            `;
+            tr.querySelector('.edit-btn').addEventListener('click', () => openFacultyModal('edit', fac.id));
+            tr.querySelector('.delete-btn').addEventListener('click', () => deleteFaculty(fac.id));
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;color:red">Error cargando</td></tr>`;
+    }
 }
 
-function openFacultyModal(mode, id = null) {
-    const planWorkForm = document.getElementById('planWorkForm');
-    if (planWorkForm) planWorkForm.remove();
-
+async function openFacultyModal(mode, id = null) {
     window.showForm(mode === 'create' ? 'Nueva Facultad' : 'Editar Facultad');
     document.getElementById('dataForm').style.display = 'none';
     document.getElementById('profForm').style.display = 'none';
@@ -97,12 +100,19 @@ function openFacultyModal(mode, id = null) {
         facultyForm.dataset.mode = 'create';
         facultyForm.dataset.id = '';
     } else {
-        const faculty = store.faculties.find(f => f.id === id);
-        if (faculty) {
-            document.getElementById('facName').value = faculty.name;
-            document.getElementById('facDescription').value = faculty.description || '';
-            facultyForm.dataset.mode = 'edit';
-            facultyForm.dataset.id = id;
+        try {
+            const res = await window.authFetch('http://localhost:3001/api/faculties');
+            const json = await res.json();
+            const faculty = json.data.find(f => f.id == id);
+
+            if (faculty) {
+                document.getElementById('facName').value = faculty.name;
+                document.getElementById('facDescription').value = faculty.description || '';
+                facultyForm.dataset.mode = 'edit';
+                facultyForm.dataset.id = id;
+            }
+        } catch (error) {
+            console.error('Error:', error);
         }
     }
 }
@@ -130,31 +140,81 @@ function createFacultyForm() {
     formSection.appendChild(form);
 }
 
-function saveFaculty() {
+async function saveFaculty() {
     const form = document.getElementById('facultyForm');
     const facultyData = {
-        id: form.dataset.mode === 'create' ? 'FAC-' + Date.now() : form.dataset.id,
         name: document.getElementById('facName').value,
         description: document.getElementById('facDescription').value
     };
 
-    if (form.dataset.mode === 'create') {
-        store.faculties.push(facultyData);
-        showNotification('Facultad creada');
-    } else {
-        const idx = store.faculties.findIndex(f => f.id === form.dataset.id);
-        if (idx !== -1) store.faculties[idx] = facultyData;
-        showNotification('Facultad actualizada');
-    }
+    try {
+        const url = form.dataset.mode === 'create'
+            ? 'http://localhost:3001/api/faculties'
+            : `http://localhost:3001/api/faculties/${form.dataset.id}`;
 
-    window.showDataSection('utilidades');
+        const method = form.dataset.mode === 'create' ? 'POST' : 'PUT';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(facultyData)
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            await window.showCustomAlert('Error', json.error || 'Error guardando facultad', 'error');
+            return;
+        }
+
+        currentUtilityType = 'faculties';
+
+        await window.showCustomAlert(
+            'Éxito',
+            form.dataset.mode === 'create' ? 'Facultad creada exitosamente' : 'Facultad actualizada exitosamente',
+            'success'
+        );
+
+        window.showDataSection('utilidades');
+    } catch (error) {
+        console.error('Error:', error);
+        await window.showCustomAlert('Error', 'Error guardando facultad', 'error');
+    }
 }
 
-function deleteFaculty(id) {
-    if (confirm('¿Está seguro de eliminar esta facultad?')) {
-        store.faculties = store.faculties.filter(f => f.id !== id);
+async function deleteFaculty(id) {
+    try {
+        const resGet = await window.authFetch('http://localhost:3001/api/faculties');
+        const jsonGet = await resGet.json();
+        const faculty = jsonGet.data.find(f => f.id == id);
+
+        const confirmed = await window.showCustomAlert(
+            '¿Eliminar facultad?',
+            `¿Está seguro de eliminar "${faculty.name}"?\n\nLos grupos conservarán el nombre.`,
+            'warning',
+            true
+        );
+
+        if (!confirmed) return;
+
+        const res = await fetch(`http://localhost:3001/api/faculties/${id}`, {
+            method: 'DELETE'
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            await window.showCustomAlert('Error', json.error || 'Error eliminando facultad', 'error');
+            return;
+        }
+
+        await window.showCustomAlert('Éxito', 'Facultad eliminada exitosamente', 'success');
+
+        currentUtilityType = 'faculties';
         loadUtilidades();
-        showNotification('Facultad eliminada');
+    } catch (error) {
+        console.error('Error:', error);
+        await window.showCustomAlert('Error', 'Error eliminando facultad', 'error');
     }
 }
 
@@ -162,7 +222,7 @@ function deleteFaculty(id) {
 /*                                  PROGRAMAS                                 */
 /* -------------------------------------------------------------------------- */
 
-function loadPrograms(btn, btnText) {
+async function loadPrograms(btn, btnText) {
     if (btnText) btnText.textContent = 'Nuevo Programa';
     if (btn) btn.onclick = () => openProgramModal('create');
 
@@ -173,36 +233,42 @@ function loadPrograms(btn, btnText) {
     if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
     tbody.innerHTML = '';
 
-    const programs = store.programs || [];
-    if (!programs.length) {
-        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay programas registrados.</td></tr>`;
-        return;
-    }
+    try {
+        const res = await window.authFetch('http://localhost:3001/api/programs');
+        if (!res.ok) throw new Error('Error');
 
-    programs.forEach(prog => {
-        const faculty = store.faculties.find(f => f.id === prog.facultyId);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${prog.code}</td>
-            <td>${prog.name}</td>
-            <td>${faculty ? faculty.name : 'N/A'}</td>
-            <td>${prog.description || 'N/A'}</td>
-            <td>
-                <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
-                <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
-            </td>
-        `;
-        tr.querySelector('.edit-btn').addEventListener('click', () => openProgramModal('edit', prog.id));
-        tr.querySelector('.delete-btn').addEventListener('click', () => deleteProgram(prog.id));
-        tbody.appendChild(tr);
-    });
+        const json = await res.json();
+        const programs = json.data || [];
+
+        if (!programs.length) {
+            tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay programas.</td></tr>`;
+            return;
+        }
+
+        programs.forEach(prog => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${prog.code}</td>
+                <td>${prog.name}</td>
+                <td>${prog.faculty_name || 'N/A'}</td>
+                <td>${prog.description || 'N/A'}</td>
+                <td>
+                    <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
+                    <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
+                </td>
+            `;
+            tr.querySelector('.edit-btn').addEventListener('click', () => openProgramModal('edit', prog.id));
+            tr.querySelector('.delete-btn').addEventListener('click', () => deleteProgram(prog.id));
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;color:red">Error cargando</td></tr>`;
+    }
 }
 
-function openProgramModal(mode, id = null) {
+async function openProgramModal(mode, id = null) {
     window.showForm(mode === 'create' ? 'Nuevo Programa' : 'Editar Programa');
-
-    const planWorkForm = document.getElementById('planWorkForm');
-    if (planWorkForm) planWorkForm.remove();
 
     document.getElementById('dataForm').style.display = 'none';
     document.getElementById('profForm').style.display = 'none';
@@ -214,22 +280,28 @@ function openProgramModal(mode, id = null) {
     }
 
     programForm.style.display = 'block';
-    populateFacultyDropdownInProgram();
+    await populateFacultyDropdownInProgram();
 
     if (mode === 'create') {
         programForm.reset();
         programForm.dataset.mode = 'create';
         programForm.dataset.id = '';
     } else {
-        const program = store.programs.find(p => p.id === id);
-        if (program) {
-            document.getElementById('progCode').value = program.code;
-            document.getElementById('progName').value = program.name;
-            document.getElementById('progFaculty').value = program.facultyId;
-            document.getElementById('progDocuments').value = program.documents || '';
-            document.getElementById('progDescription').value = program.description || '';
-            programForm.dataset.mode = 'edit';
-            programForm.dataset.id = id;
+        try {
+            const res = await window.authFetch('http://localhost:3001/api/programs');
+            const json = await res.json();
+            const program = json.data.find(p => p.id == id);
+
+            if (program) {
+                document.getElementById('progCode').value = program.code;
+                document.getElementById('progName').value = program.name;
+                document.getElementById('progFaculty').value = program.faculty_id;
+                document.getElementById('progDescription').value = program.description || '';
+                programForm.dataset.mode = 'edit';
+                programForm.dataset.id = id;
+            }
+        } catch (error) {
+            console.error('Error:', error);
         }
     }
 }
@@ -271,373 +343,415 @@ function createProgramForm() {
     formSection.appendChild(form);
 }
 
-function populateFacultyDropdownInProgram() {
+async function populateFacultyDropdownInProgram() {
     const sel = document.getElementById('progFaculty');
-    sel.innerHTML = '<option value="">-- Seleccionar Facultad --</option>' +
-        store.faculties.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+    try {
+        const res = await window.authFetch('http://localhost:3001/api/faculties');
+        const json = await res.json();
+        const faculties = json.data || [];
+        sel.innerHTML = '<option value="">-- Seleccionar Facultad --</option>' +
+            faculties.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+    } catch (error) {
+        console.error('Error:', error);
+        sel.innerHTML = '<option value="">Error cargando facultades</option>';
+    }
 }
 
-function saveProgram() {
+async function saveProgram() {
     const form = document.getElementById('programForm');
     const programData = {
-        id: form.dataset.mode === 'create' ? 'PROG-' + Date.now() : form.dataset.id,
         code: document.getElementById('progCode').value,
         name: document.getElementById('progName').value,
-        facultyId: document.getElementById('progFaculty').value,
-        documents: document.getElementById('progDocuments').value,
+        faculty_id: document.getElementById('progFaculty').value,
         description: document.getElementById('progDescription').value
     };
 
-    if (form.dataset.mode === 'create') {
-        store.programs.push(programData);
-        showNotification('Programa creado');
-    } else {
-        const idx = store.programs.findIndex(p => p.id === form.dataset.id);
-        if (idx !== -1) store.programs[idx] = programData;
-        showNotification('Programa actualizado');
-    }
+    try {
+        const url = form.dataset.mode === 'create'
+            ? 'http://localhost:3001/api/programs'
+            : `http://localhost:3001/api/programs/${form.dataset.id}`;
 
-    window.showDataSection('utilidades');
+        const method = form.dataset.mode === 'create' ? 'POST' : 'PUT';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(programData)
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            await window.showCustomAlert('Error', json.error || 'Error guardando programa', 'error');
+            return;
+        }
+
+        currentUtilityType = 'programs';
+
+        await window.showCustomAlert(
+            'Éxito',
+            form.dataset.mode === 'create' ? 'Programa creado exitosamente' : 'Programa actualizado exitosamente',
+            'success'
+        );
+
+        window.showDataSection('utilidades');
+    } catch (error) {
+        console.error('Error:', error);
+        await window.showCustomAlert('Error', 'Error guardando programa', 'error');
+    }
 }
 
-function deleteProgram(id) {
-    if (confirm('¿Está seguro de eliminar este programa?')) {
-        store.programs = store.programs.filter(p => p.id !== id);
+async function deleteProgram(id) {
+    try {
+        const resGet = await window.authFetch('http://localhost:3001/api/programs');
+        const jsonGet = await resGet.json();
+        const program = jsonGet.data.find(p => p.id == id);
+
+        const confirmed = await window.showCustomAlert(
+            '¿Eliminar programa?',
+            `¿Está seguro de eliminar "${program.name}"?\n\nLos grupos conservarán el nombre.`,
+            'warning',
+            true
+        );
+
+        if (!confirmed) return;
+
+        const res = await fetch(`http://localhost:3001/api/programs/${id}`, {
+            method: 'DELETE'
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            await window.showCustomAlert('Error', json.error || 'Error eliminando programa', 'error');
+            return;
+        }
+
+        await window.showCustomAlert('Éxito', 'Programa eliminado exitosamente', 'success');
+
+        currentUtilityType = 'programs';
         loadUtilidades();
-        showNotification('Programa eliminado');
+    } catch (error) {
+        console.error('Error:', error);
+        await window.showCustomAlert('Error', 'Error eliminando programa', 'error');
     }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 ASIGNATURAS                                */
+/*                          GESTIÓN DE DOCUMENTOS                             */
 /* -------------------------------------------------------------------------- */
 
-function loadSubjects(btn, btnText) {
-    if (btnText) btnText.textContent = 'Nueva Asignatura';
-    if (btn) btn.onclick = () => openSubjectModal('create');
+function loadDocuments(btn, btnText) {
+    if (btnText) btnText.textContent = 'Nuevo Tipo de Documento';
+    if (btn) btn.onclick = () => openDocumentTypeModal('create');
 
     const thead = document.getElementById('tableHeader');
     const tbody = document.getElementById('tableBody');
-    const headers = ['Código', 'Nombre', 'Programa', 'Créditos', 'Horas/Sem', 'Acciones'];
+    const headers = ['Nombre', 'Descripción', 'Acciones'];
 
-    thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-    tbody.innerHTML = '';
+    if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+    if (tbody) tbody.innerHTML = '';
 
-    let searchBox = document.getElementById('subjectSearchBox');
-    if (!searchBox) {
-        searchBox = document.createElement('div');
-        searchBox.id = 'subjectSearchBox';
-        searchBox.style.marginBottom = '1rem';
-        searchBox.innerHTML = `
-            <input type="text" id="subjectSearch" class="form-control" placeholder="Buscar por código o nombre..." style="max-width: 400px;">
-        `;
-        document.getElementById('dataSection').querySelector('.section-header').after(searchBox);
-        document.getElementById('subjectSearch').addEventListener('input', e => filterSubjects(e.target.value));
-    }
-
-    const subjects = store.subjects || [];
-    if (!subjects.length) {
-        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay asignaturas registradas.</td></tr>`;
+    const documentTypes = store.documentTypes || [];
+    if (!documentTypes.length && tbody) {
+        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay tipos de documentos registrados.</td></tr>`;
         return;
     }
 
-    renderSubjects(subjects, tbody);
-}
-
-function renderSubjects(subjects, tbody) {
-    tbody.innerHTML = '';
-    subjects.forEach(subj => {
-        const program = store.programs.find(p => p.id === subj.programId);
+    documentTypes.forEach(docType => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${subj.code}</td>
-            <td>${subj.name}</td>
-            <td>${program ? program.name : 'N/A'}</td>
-            <td>${subj.credits}</td>
-            <td>${subj.hoursPerWeek}</td>
+            <td>${docType.name}</td>
+            <td>${docType.description || 'N/A'}</td>
             <td>
                 <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
                 <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
             </td>
         `;
-        tr.querySelector('.edit-btn').addEventListener('click', () => openSubjectModal('edit', subj.id));
-        tr.querySelector('.delete-btn').addEventListener('click', () => deleteSubject(subj.id));
+        tr.querySelector('.edit-btn').addEventListener('click', () => openDocumentTypeModal('edit', docType.id));
+        tr.querySelector('.delete-btn').addEventListener('click', () => deleteDocumentType(docType.id));
         tbody.appendChild(tr);
     });
 }
 
-function filterSubjects(query) {
-    const subjects = store.subjects || [];
-    const filtered = subjects.filter(s =>
-        s.code.toLowerCase().includes(query.toLowerCase()) ||
-        s.name.toLowerCase().includes(query.toLowerCase())
-    );
-    const tbody = document.getElementById('tableBody');
-    renderSubjects(filtered, tbody);
-}
-
-function openSubjectModal(mode, id = null) {
-    window.showForm(mode === 'create' ? 'Nueva Asignatura' : 'Editar Asignatura');
-
-    // Clean up plan form if exists
-    const planWorkForm = document.getElementById('planWorkForm');
-    if (planWorkForm) planWorkForm.remove();
-    const planEditorForm = document.getElementById('planEditorForm');
-    if (planEditorForm) planEditorForm.remove();
-
+function openDocumentTypeModal(mode, id = null) {
+    window.showForm(mode === 'create' ? 'Nuevo Tipo de Documento' : 'Editar Tipo de Documento');
     document.getElementById('dataForm').style.display = 'none';
     document.getElementById('profForm').style.display = 'none';
 
-    const searchBox = document.getElementById('subjectSearchBox');
-    if (searchBox) searchBox.style.display = 'none';
-
-    let subjectForm = document.getElementById('subjectForm');
-    if (!subjectForm) {
-        createSubjectForm();
-        subjectForm = document.getElementById('subjectForm');
+    let documentTypeForm = document.getElementById('documentTypeForm');
+    if (!documentTypeForm) {
+        createDocumentTypeForm();
+        documentTypeForm = document.getElementById('documentTypeForm');
     }
 
-    subjectForm.style.display = 'block';
-    populateProgramDropdownInSubject();
+    documentTypeForm.style.display = 'block';
 
     if (mode === 'create') {
-        subjectForm.reset();
-        subjectForm.dataset.mode = 'create';
-        subjectForm.dataset.id = '';
+        documentTypeForm.reset();
+        documentTypeForm.dataset.mode = 'create';
+        documentTypeForm.dataset.id = '';
     } else {
-        const subject = store.subjects.find(s => s.id === id);
-        if (subject) {
-            document.getElementById('subjCode').value = subject.code;
-            document.getElementById('subjName').value = subject.name;
-            document.getElementById('subjProgram').value = subject.programId;
-            document.getElementById('subjCredits').value = subject.credits;
-            document.getElementById('subjHours').value = subject.hoursPerWeek;
-            subjectForm.dataset.mode = 'edit';
-            subjectForm.dataset.id = id;
+        const docType = store.documentTypes.find(d => d.id === id);
+        if (docType) {
+            document.getElementById('docTypeName').value = docType.name;
+            document.getElementById('docTypeDescription').value = docType.description || '';
+            documentTypeForm.dataset.mode = 'edit';
+            documentTypeForm.dataset.id = id;
         }
     }
 }
 
-function createSubjectForm() {
+function createDocumentTypeForm() {
     const formSection = document.getElementById('formSection');
     const form = document.createElement('form');
-    form.id = 'subjectForm';
+    form.id = 'documentTypeForm';
     form.style.display = 'none';
     form.innerHTML = `
-        <div class="form-row">
-            <div class="form-group">
-                <label for="subjCode">Código *</label>
-                <input id="subjCode" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="subjName">Nombre *</label>
-                <input id="subjName" class="form-control" required>
-            </div>
+        <div class="form-group">
+            <label for="docTypeName">Nombre del Tipo de Documento *</label>
+            <input id="docTypeName" class="form-control" required placeholder="Ej: Acta, Informe, Memorando">
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="subjProgram">Programa *</label>
-                <select id="subjProgram" class="form-control" required></select>
-            </div>
-            <div class="form-group">
-                <label for="subjCredits">Créditos *</label>
-                <input type="number" id="subjCredits" class="form-control" min="1" max="10" required>
-            </div>
-            <div class="form-group">
-                <label for="subjHours">Horas/Semana *</label>
-                <input type="number" id="subjHours" class="form-control" min="1" max="20" required>
-            </div>
+        <div class="form-group">
+            <label for="docTypeDescription">Descripción</label>
+            <textarea id="docTypeDescription" class="form-control" rows="3" placeholder="Descripción del tipo de documento"></textarea>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:.5rem; margin-top:1.5rem; border-top:1px solid #e2e8f0; padding-top:1rem">
-            <button type="button" class="btn btn-secondary">Cancelar</button>
+            <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
         </div>
     `;
-    form.onsubmit = e => { e.preventDefault(); saveSubject(); };
+    form.onsubmit = e => { e.preventDefault(); saveDocumentType(); };
     formSection.appendChild(form);
 }
 
-function populateProgramDropdownInSubject() {
-    const sel = document.getElementById('subjProgram');
-    sel.innerHTML = '<option value="">-- Seleccionar Programa --</option>' +
-        store.programs.map(p => {
-            const faculty = store.faculties.find(f => f.id === p.facultyId);
-            return `<option value="${p.id}">${p.name} (${faculty ? faculty.name : 'N/A'})</option>`;
-        }).join('');
-}
-
-function saveSubject() {
-    const form = document.getElementById('subjectForm');
-    const subjectData = {
-        id: form.dataset.mode === 'create' ? 'SUBJ-' + Date.now() : form.dataset.id,
-        code: document.getElementById('subjCode').value,
-        name: document.getElementById('subjName').value,
-        programId: document.getElementById('subjProgram').value,
-        credits: parseInt(document.getElementById('subjCredits').value),
-        hoursPerWeek: parseInt(document.getElementById('subjHours').value)
+function saveDocumentType() {
+    const form = document.getElementById('documentTypeForm');
+    const documentTypeData = {
+        id: form.dataset.mode === 'create' ? 'DOCTYPE-' + Date.now() : form.dataset.id,
+        name: document.getElementById('docTypeName').value,
+        description: document.getElementById('docTypeDescription').value
     };
 
-    if (!store.subjects) store.subjects = [];
+    if (!store.documentTypes) store.documentTypes = [];
 
     if (form.dataset.mode === 'create') {
-        store.subjects.push(subjectData);
-        showNotification('Asignatura creada');
+        store.documentTypes.push(documentTypeData);
+        showNotification('Tipo de documento creado');
     } else {
-        const idx = store.subjects.findIndex(s => s.id === form.dataset.id);
-        if (idx !== -1) store.subjects[idx] = subjectData;
-        showNotification('Asignatura actualizada');
+        const idx = store.documentTypes.findIndex(d => d.id === form.dataset.id);
+        if (idx !== -1) store.documentTypes[idx] = documentTypeData;
+        showNotification('Tipo de documento actualizado');
     }
-
-    const searchBox = document.getElementById('subjectSearchBox');
-    if (searchBox) searchBox.style.display = 'block';
 
     window.showDataSection('utilidades');
 }
 
-function deleteSubject(id) {
-    if (confirm('¿Está seguro de eliminar esta asignatura?')) {
-        store.subjects = store.subjects.filter(s => s.id !== id);
+
+function deleteDocumentType(id) {
+    if (confirm('¿Está seguro de eliminar este tipo de documento?')) {
+        store.documentTypes = store.documentTypes.filter(d => d.id !== id);
         loadUtilidades();
-        showNotification('Asignatura eliminada');
+        showNotification('Tipo de documento eliminado');
     }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 ACTIVIDADES                                */
+/*                        CATEGORÍAS DE DOCUMENTOS                            */
 /* -------------------------------------------------------------------------- */
 
-function loadActivities(btn, btnText) {
-    if (btnText) btnText.textContent = 'Nueva Actividad';
-    if (btn) btn.onclick = () => openActivityModal('create');
+async function loadCategories(btn, btnText) {
+    if (btnText) btnText.textContent = 'Nueva Categoría';
+    if (btn) btn.onclick = () => openCategoryModal('create');
 
     const thead = document.getElementById('tableHeader');
     const tbody = document.getElementById('tableBody');
-    const headers = ['Tipo', 'Nombre', 'Descripción', 'Acciones'];
+    const headers = ['Nombre', 'Descripción', 'Acciones'];
 
-    thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-    tbody.innerHTML = '';
+    if (thead) thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+    if (tbody) tbody.innerHTML = '';
 
-    const activities = store.planActivities || [];
-    if (!activities.length) {
-        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay actividades registradas.</td></tr>`;
-        return;
-    }
+    try {
+        const res = await window.authFetch('http://localhost:3001/api/document-categories');
+        if (!res.ok) throw new Error('Error cargando categorías');
 
-    activities.forEach(act => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><span class="pill">${act.type}</span></td>
-            <td>${act.name}</td>
-            <td>${act.description || 'N/A'}</td>
-            <td>
-                <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
-                <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
-            </td>
-        `;
-        tr.querySelector('.edit-btn').addEventListener('click', () => openActivityModal('edit', act.id));
-        tr.querySelector('.delete-btn').addEventListener('click', () => deleteActivity(act.id));
-        tbody.appendChild(tr);
-    });
-}
+        const json = await res.json();
+        const categories = json.data || [];
 
-function openActivityModal(mode, id = null) {
-    window.showForm(mode === 'create' ? 'Nueva Actividad' : 'Editar Actividad');
+        if (!categories.length && tbody) {
+            tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem">No hay categorías registradas.</td></tr>`;
+            return;
+        }
 
-    // Clean up plan form if exists
-    const planWorkForm = document.getElementById('planWorkForm');
-    if (planWorkForm) planWorkForm.remove();
-    const planEditorForm = document.getElementById('planEditorForm');
-    if (planEditorForm) planEditorForm.remove();
-
-    document.getElementById('dataForm').style.display = 'none';
-    document.getElementById('profForm').style.display = 'none';
-
-    let activityForm = document.getElementById('activityForm');
-    if (!activityForm) {
-        createActivityForm();
-        activityForm = document.getElementById('activityForm');
-    }
-
-    activityForm.style.display = 'block';
-
-    if (mode === 'create') {
-        activityForm.reset();
-        activityForm.dataset.mode = 'create';
-        activityForm.dataset.id = '';
-    } else {
-        const activity = store.planActivities.find(a => a.id === id);
-        if (activity) {
-            document.getElementById('actType').value = activity.type;
-            document.getElementById('actName').value = activity.name;
-            document.getElementById('actDescription').value = activity.description;
-            activityForm.dataset.mode = 'edit';
-            activityForm.dataset.id = id;
+        categories.forEach(cat => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${cat.name}</td>
+                <td>${cat.description || 'N/A'}</td>
+                <td>
+                    <button class='btn btn-primary edit-btn'><i class='fas fa-edit'></i></button>
+                    <button class='btn btn-danger delete-btn'><i class='fas fa-trash'></i></button>
+                </td>
+            `;
+            tr.querySelector('.edit-btn').addEventListener('click', () => openCategoryModal('edit', cat.id));
+            tr.querySelector('.delete-btn').addEventListener('click', () => deleteCategory(cat.id));
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:1.5rem;color:red">Error cargando categorías</td></tr>`;
         }
     }
 }
 
-function createActivityForm() {
+async function openCategoryModal(mode, id = null) {
+    window.showForm(mode === 'create' ? 'Nueva Categoría' : 'Editar Categoría');
+    document.getElementById('dataForm').style.display = 'none';
+    document.getElementById('profForm').style.display = 'none';
+
+    let categoryForm = document.getElementById('categoryForm');
+    if (!categoryForm) {
+        createCategoryForm();
+        categoryForm = document.getElementById('categoryForm');
+    }
+
+    categoryForm.style.display = 'block';
+
+    if (mode === 'create') {
+        categoryForm.reset();
+        categoryForm.dataset.mode = 'create';
+        categoryForm.dataset.id = '';
+    } else {
+        try {
+            const res = await window.authFetch('http://localhost:3001/api/document-categories');
+            const json = await res.json();
+            const category = json.data.find(c => c.id == id);
+
+            if (category) {
+                document.getElementById('catName').value = category.name;
+                document.getElementById('catDescription').value = category.description || '';
+                categoryForm.dataset.mode = 'edit';
+                categoryForm.dataset.id = id;
+            }
+        } catch (error) {
+            console.error('Error cargando categoría:', error);
+            showNotification('Error cargando categoría', 'error');
+        }
+    }
+}
+
+function createCategoryForm() {
     const formSection = document.getElementById('formSection');
     const form = document.createElement('form');
-    form.id = 'activityForm';
+    form.id = 'categoryForm';
     form.style.display = 'none';
     form.innerHTML = `
         <div class="form-group">
-            <label for="actType">Tipo de Actividad *</label>
-            <select id="actType" class="form-control" required>
-                <option value="">-- Seleccionar Tipo --</option>
-                <option value="Apoyo Docencia">Apoyo Docencia</option>
-                <option value="Trabajos de Grado">Trabajos de Grado</option>
-                <option value="Investigación">Investigación</option>
-                <option value="PDI">PDI</option>
-                <option value="Gestión">Gestión</option>
-            </select>
+            <label for="catName">Nombre de la Categoría *</label>
+            <input id="catName" class="form-control" required placeholder="Ej: Comité Curricular, Consejo de Facultad">
         </div>
         <div class="form-group">
-            <label for="actName">Nombre de la Actividad *</label>
-            <input id="actName" class="form-control" required>
-        </div>
-        <div class="form-group">
-            <label for="actDescription">Descripción</label>
-            <textarea id="actDescription" class="form-control" rows="3"></textarea>
+            <label for="catDescription">Descripción</label>
+            <textarea id="catDescription" class="form-control" rows="3" placeholder="Descripción de la categoría"></textarea>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:.5rem; margin-top:1.5rem; border-top:1px solid #e2e8f0; padding-top:1rem">
-            <button type="button" class="btn btn-secondary">Cancelar</button>
+            <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
         </div>
     `;
-    form.onsubmit = e => { e.preventDefault(); saveActivity(); };
+    form.onsubmit = e => { e.preventDefault(); saveCategory(); };
     formSection.appendChild(form);
 }
 
-function saveActivity() {
-    const form = document.getElementById('activityForm');
-    const activityData = {
-        id: form.dataset.mode === 'create' ? 'ACT-' + Date.now() : form.dataset.id,
-        type: document.getElementById('actType').value,
-        name: document.getElementById('actName').value,
-        description: document.getElementById('actDescription').value
+async function saveCategory() {
+    const form = document.getElementById('categoryForm');
+    const categoryData = {
+        name: document.getElementById('catName').value,
+        description: document.getElementById('catDescription').value
     };
 
-    if (!store.planActivities) store.planActivities = [];
+    try {
+        const url = form.dataset.mode === 'create'
+            ? 'http://localhost:3001/api/document-categories'
+            : `http://localhost:3001/api/document-categories/${form.dataset.id}`;
 
-    if (form.dataset.mode === 'create') {
-        store.planActivities.push(activityData);
-        showNotification('Actividad creada');
-    } else {
-        const idx = store.planActivities.findIndex(a => a.id === form.dataset.id);
-        if (idx !== -1) store.planActivities[idx] = activityData;
-        showNotification('Actividad actualizada');
+        const method = form.dataset.mode === 'create' ? 'POST' : 'PUT';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(categoryData)
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            await window.showCustomAlert('Error', json.error || 'Error guardando categoría', 'error');
+            return;
+        }
+
+        currentUtilityType = 'categories';
+
+        await window.showCustomAlert(
+            'Éxito',
+            form.dataset.mode === 'create' ? 'Categoría creada exitosamente' : 'Categoría actualizada exitosamente',
+            'success'
+        );
+
+        window.showDataSection('utilidades');
+    } catch (error) {
+        console.error('Error:', error);
+        await window.showCustomAlert('Error', 'Error guardando categoría', 'error');
     }
-
-    window.showDataSection('utilidades');
 }
 
-function deleteActivity(id) {
-    if (confirm('¿Está seguro de eliminar esta actividad?')) {
-        store.planActivities = store.planActivities.filter(a => a.id !== id);
+async function deleteCategory(id) {
+    try {
+        // Primero obtener info de la categoría para mostrar mensaje informativo
+        const resGet = await window.authFetch('http://localhost:3001/api/document-categories');
+        const jsonGet = await resGet.json();
+        const category = jsonGet.data.find(c => c.id == id);
+
+        const confirmed = await window.showCustomAlert(
+            '¿Eliminar categoría?',
+            `¿Está seguro de eliminar la categoría "${category.name}"?\n\nNota: Las actas que usen esta categoría la conservarán en su registro.`,
+            'warning',
+            true
+        );
+
+        if (!confirmed) return;
+
+        const res = await fetch(`http://localhost:3001/api/document-categories/${id}`, {
+            method: 'DELETE'
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            await window.showCustomAlert('Error', json.error || 'Error eliminando categoría', 'error');
+            return;
+        }
+
+        currentUtilityType = 'categories';
+
+        const message = json.actasAffected > 0
+            ? `Categoría eliminada.\n${json.actasAffected} acta(s) conservan el nombre.`
+            : 'Categoría eliminada exitosamente';
+
+        await window.showCustomAlert('Éxito', message, 'success');
+
         loadUtilidades();
-        showNotification('Actividad eliminada');
+    } catch (error) {
+        console.error('Error:', error);
+        await window.showCustomAlert('Error', 'Error eliminando categoría', 'error');
     }
 }
+
+
+
+
+
+
+
 

@@ -32,6 +32,18 @@ export const store = {
         { id: 'PROG-001', code: '090502', name: 'Lic. en Recreación', facultyId: 'FAC-001', documents: '', description: 'Programa de Licenciatura en Recreación' },
         { id: 'PROG-002', code: '090501', name: 'Lic. en Educación Infantil', facultyId: 'FAC-001', documents: '', description: 'Programa de Licenciatura en Educación Infantil' }
     ],
+    // Tipos de documentos
+    documentTypes: [
+        { id: 'DOCTYPE-001', name: 'Acta Estudiantes', description: 'Actas de reunión con estudiantes' },
+        { id: 'DOCTYPE-002', name: 'Informe', description: 'Informes académicos o administrativos' },
+        { id: 'DOCTYPE-003', name: 'Memorando', description: 'Comunicados internos' }
+    ],
+    // Categorías de documentos
+    documentCategories: [
+        { id: 'CAT-001', name: 'Comité Curricular', description: 'Reuniones del comité curricular del programa' },
+        { id: 'CAT-002', name: 'Consejo de Facultad', description: 'Reuniones del consejo de facultad' },
+        { id: 'CAT-003', name: 'Reuniones de Grupo', description: 'Reuniones con cohortes o grupos de estudiantes' }
+    ],
     subjects: [
         { id: 'SUBJ-001', code: 'REC101', name: 'Fundamentos de Recreación', programId: 'PROG-001', credits: 3, hoursPerWeek: 4 },
         { id: 'SUBJ-002', code: 'REC201', name: 'Pedagogía del Juego', programId: 'PROG-001', credits: 4, hoursPerWeek: 6 },

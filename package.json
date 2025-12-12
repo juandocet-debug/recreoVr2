@@ -1,0 +1,28 @@
+{
+  "name": "recreo-vr",
+  "version": "1.0.0",
+  "description": "Sistema de gestión educativa - Registro de Actas y Grupos",
+  "main": "server/app.js",
+  "scripts": {
+    "start": "node server/app.js",
+    "dev": "node server/app.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.7"
+  },
+  "keywords": [
+    "educacion",
+    "actas",
+    "grupos",
+    "gestion"
+  ],
+  "author": "Juan David",
+  "license": "ISC"
+}

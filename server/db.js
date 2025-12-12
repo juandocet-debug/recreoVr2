@@ -27,10 +27,21 @@ function initDb() {
             if (err) {
                 console.error("Error creating table users:", err);
             } else {
-                // Schema Migration for Users
+                // Schema Migration for Users - Agregar todos los campos de professors
                 const columnsToAdd = [
                     "ALTER TABLE users ADD COLUMN mustChangePassword INTEGER DEFAULT 1",
-                    "ALTER TABLE users ADD COLUMN relatedId TEXT"
+                    "ALTER TABLE users ADD COLUMN relatedId TEXT",
+                    "ALTER TABLE users ADD COLUMN group_id TEXT",
+                    "ALTER TABLE users ADD COLUMN email TEXT",
+                    "ALTER TABLE users ADD COLUMN photo TEXT",
+                    "ALTER TABLE users ADD COLUMN specialty TEXT",
+                    "ALTER TABLE users ADD COLUMN cv TEXT",
+                    "ALTER TABLE users ADD COLUMN profile TEXT",
+                    "ALTER TABLE users ADD COLUMN identification TEXT",
+                    "ALTER TABLE users ADD COLUMN phone TEXT",
+                    "ALTER TABLE users ADD COLUMN gender TEXT",
+                    "ALTER TABLE users ADD COLUMN sex TEXT",
+                    "ALTER TABLE users ADD COLUMN signatureImage TEXT"
                 ];
 
                 columnsToAdd.forEach(sql => {
@@ -57,54 +68,6 @@ function initDb() {
             }
         });
 
-        // Professors Table
-        db.run(`CREATE TABLE IF NOT EXISTS professors (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            email TEXT,
-            photo TEXT,
-            specialty TEXT,
-            cv TEXT,
-            profile TEXT,
-            role TEXT,
-            identification TEXT,
-            phone TEXT,
-            gender TEXT,
-            sex TEXT
-        )`, (err) => {
-            if (err) {
-                console.error("Error creating table professors:", err);
-            } else {
-                // Attempt to add new columns if they don't exist (Schema Migration)
-                const columnsToAdd = [
-                    "ALTER TABLE professors ADD COLUMN identification TEXT",
-                    "ALTER TABLE professors ADD COLUMN phone TEXT",
-                    "ALTER TABLE professors ADD COLUMN gender TEXT",
-                    "ALTER TABLE professors ADD COLUMN sex TEXT",
-                    "ALTER TABLE professors ADD COLUMN signatureImage TEXT"
-                ];
-
-                columnsToAdd.forEach(sql => {
-                    db.run(sql, (err) => {
-                        // Ignore error if column already exists
-                        if (err && !err.message.includes("duplicate column")) {
-                            // console.error("Migration note:", err.message); 
-                        }
-                    });
-                });
-
-                // Seed initial professors
-                db.get("SELECT count(*) as count FROM professors", (err, row) => {
-                    if (row.count === 0) {
-                        console.log("Seeding initial professors...");
-                        const stmt = db.prepare("INSERT INTO professors (id, name, email, photo, specialty, cv, profile, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                        stmt.run('P-001', 'Dra. Ana Ruiz', 'ana@uni.edu', null, 'Educación/TIC', 'PhD en Pedagogía.', 'Investigadora senior.', 'profesor');
-                        stmt.run('P-002', 'Ing. Carlos Pérez', 'carlos@uni.edu', null, '.NET/Agile', 'MSc. en Ing. de Software.', 'Líder innovación.', 'coordinador');
-                        stmt.finalize();
-                    }
-                });
-            }
-        });
         // Actas Table
         db.run(`CREATE TABLE IF NOT EXISTS actas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,9 +82,118 @@ function initDb() {
             commitments TEXT,
             nextMeeting TEXT,
             groupId TEXT,
-            signatures TEXT
+            signatures TEXT,
+            createdBy TEXT
         )`, (err) => {
             if (err) console.error("Error creating table actas:", err);
+            // Migración: agregar columna createdBy si no existe
+            db.run("ALTER TABLE actas ADD COLUMN createdBy TEXT", (err) => {
+                // Ignorar error si ya existe
+            });
+        });
+
+        // Document Categories Table
+        db.run(`CREATE TABLE IF NOT EXISTS document_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) {
+                console.error("Error creating table document_categories:", err);
+            } else {
+                // Seed initial categories
+                db.get("SELECT count(*) as count FROM document_categories", (err, row) => {
+                    if (row && row.count === 0) {
+                        console.log("Seeding initial document categories...");
+                        const stmt = db.prepare("INSERT INTO document_categories (name, description) VALUES (?, ?)");
+                        stmt.run('Comité Curricular', 'Reuniones del comité curricular del programa');
+                        stmt.run('Consejo de Facultad', 'Reuniones del consejo de facultad');
+                        stmt.run('Reuniones de Grupo', 'Reuniones con cohortes o grupos de estudiantes');
+                        stmt.finalize();
+                    }
+                });
+            }
+        });
+
+        // Faculties Table
+        db.run(`CREATE TABLE IF NOT EXISTS faculties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) {
+                console.error("Error creating table faculties:", err);
+            } else {
+                db.get("SELECT count(*) as count FROM faculties", (err, row) => {
+                    if (row && row.count === 0) {
+                        console.log("Seeding initial faculties...");
+                        const stmt = db.prepare("INSERT INTO faculties (name, description) VALUES (?, ?)");
+                        stmt.run('Educación', 'Facultad de Educación');
+                        stmt.run('Ciencias y Tecnología', 'Facultad de Ciencia y Tecnología');
+                        stmt.finalize();
+                    }
+                });
+            }
+        });
+
+        // Programs Table
+        db.run(`CREATE TABLE IF NOT EXISTS programs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            faculty_id INTEGER NOT NULL,
+            description TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (faculty_id) REFERENCES faculties(id)
+        )`, (err) => {
+            if (err) {
+                console.error("Error creating table programs:", err);
+            } else {
+                db.get("SELECT count(*) as count FROM programs", (err, row) => {
+                    if (row && row.count === 0) {
+                        console.log("Seeding initial programs...");
+                        const stmt = db.prepare("INSERT INTO programs (code, name, faculty_id, description) VALUES (?, ?, ?, ?)");
+                        stmt.run('090502', 'Lic. en Recreación', 1, 'Programa de Licenciatura en Recreación');
+                        stmt.run('090501', 'Lic. en Educación Infantil', 1, 'Programa de Licenciatura en Educación Infantil');
+                        stmt.finalize();
+                    }
+                });
+            }
+        });
+
+        // Groups Table
+        db.run(`CREATE TABLE IF NOT EXISTS groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            faculty_name TEXT,
+            program_name TEXT,
+            year INTEGER,
+            period TEXT,
+            advisor_id TEXT,
+            advisor_name TEXT,
+            advisor_identification TEXT,
+            advisors TEXT,
+            description TEXT,
+            documents TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) {
+                console.error("Error creating table groups:", err);
+            } else {
+                // Migración: agregar columnas si no existen
+                db.run("ALTER TABLE groups ADD COLUMN documents TEXT", (err) => {
+                    if (err && !err.message.includes("duplicate column")) {
+                        // Ignorar
+                    }
+                });
+                db.run("ALTER TABLE groups ADD COLUMN advisors TEXT", (err) => {
+                    if (err && !err.message.includes("duplicate column")) {
+                        // Ignorar
+                    }
+                });
+            }
         });
     });
 }
